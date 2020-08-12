@@ -315,10 +315,10 @@ f:RegisterEvent("GUILD_ROSTER_UPDATE");
 C_ChatInfo.RegisterAddonMessagePrefix("RATSYSTEM");
 
 f:SetScript("OnUpdate", function(self, elapsed)
-	if (playersRegister) then
+	if (playersRegister and CanEditOfficerNote()) then
 		ticks = ticks - elapsed;
 	end
-	if (not synced) then
+	if (not synced and CanEditOfficerNote()) then
 		syncDelay = syncDelay - elapsed;
 	end
 	if (syncDelay <= 0 and not synced and CanEditOfficerNote()) then
@@ -371,7 +371,7 @@ f:SetScript("OnUpdate", function(self, elapsed)
 			end
 		end
 	end
-	if (ticks <= 0 and playersRegister) then
+	if (ticks <= 0 and playersRegister and CanEditOfficerNote()) then
 		playersRegister = false;
 		ticks = 0;
 		currentIndex = 0;
@@ -564,6 +564,9 @@ f:SetScript("OnEvent", function(self, event, ...)
 		end
 		--RAT:CleanAltDb();
 	elseif (event == "PLAYER_LOGIN") then
+		if (not CanEditOfficerNote()) then
+			f:SetScript("OnUpdate", nil);
+		end
 		C_Timer.After(5, function()
 			RAT:CheckForDSTTransition();
 		end);
