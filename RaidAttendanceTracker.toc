@@ -1,0 +1,21 @@
+## Interface: 80300
+## Title: Raid Attendance Tracker
+## Version: 1.5r
+## Author: Ant-Kazzak
+## Notes: Tracks the attendance of your raiders
+## SavedVariables: RAT_SavedData
+## SavedVariables: RAT_SavedOptions
+
+Localization.enUS.lua
+RaidAttendanceTracker.lua
+Options\RaidTimes.lua
+Options\RaiderRanks.lua
+Options\Settings.lua
+Options\Help.lua
+Options\CommandCenter.lua
+RaidAttendanceTrackerMinimap.lua
+RaidAttendanceTrackerUtil.lua
+RaidAttendanceTrackerTime.lua
+RaidAttendanceTrackerMath.lua
+RaidAttendanceTrackerLog.lua
+RaidAttendanceTrackerSetup.lua
