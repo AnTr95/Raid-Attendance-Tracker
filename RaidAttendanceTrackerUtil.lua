@@ -603,7 +603,7 @@ local f = CreateFrame("Frame");
 
 f:SetScript("OnEvent", function(self, event, ...)
 	if (event == "CALENDAR_OPEN_EVENT") then
-		if (C_Calendar.GetEventInfo().time.monthDay == C_Calendar.GetDate().monthDay) then
+		if (C_Calendar.GetEventInfo().time.monthDay == C_DateAndTime.GetCurrentCalendarTime().monthDay) then
 			f:UnregisterEvent("CALENDAR_OPEN_EVENT");
 			local players = {};
 			local attending = RAT:GetLastAttending();
@@ -636,13 +636,13 @@ f:SetScript("OnEvent", function(self, event, ...)
 				end
 			end
 		else
-			C_Calendar.OpenEvent(0, C_Calendar.GetDate().monthDay, calendarRaidIndex);
+			C_Calendar.OpenEvent(0, C_DateAndTime.GetCurrentCalendarTime(), calendarRaidIndex);
 		end
 	end
 end)
 
 function RAT:PunishCalendar()
-	local date = C_Calendar.GetDate();
+	local date = C_DateAndTime.GetCurrentCalendarTime();
 	local realmMonth = date.month;
 	local realmDay = date.monthDay;
 	local realmYear = date.year;

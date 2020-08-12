@@ -45,7 +45,7 @@ function RAT:GetRealmTimeZone()
 	timeInfo.isdst = date("*t").isdst;
 	local weekday, day, month, year, hour, min, sec = weekdays[timeInfo.wday], timeInfo.day, timeInfo.month, timeInfo.year, timeInfo.hour, timeInfo.min, timeInfo.sec;
 	local realmTimeHour, realmTimeMinute = GetGameTime();
-	local realmDate = C_Calendar.GetDate();
+	local realmDate = C_DateAndTime.GetCurrentCalendarTime();
 	realmInfo.hour = realmTimeHour;
 	realmInfo.min = realmTimeMinute;
 	realmInfo.day = realmDate.monthDay;
