@@ -109,7 +109,7 @@ local function handler(msg, editbox)
 	local arg = RAT:GetArg(msg);
 	local cmd = RAT:GetCmd(msg);
 	if (cmd ~= "") then
-		if (synced and CanEditOfficerNote()) then
+		if (synced and C_GuildInfo.CanEditOfficerNote()) then
 			if (cmd == "award") then
 				local args = RAT:Split(arg);
 				if (RAT:GetSize(args) == 1) then
@@ -293,7 +293,7 @@ local function handler(msg, editbox)
 				RAT:Sync();
 				DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.SUCCESS .. L.ADDON .. L.SYSTEM_STARTED_SYNC);
 			end
-		elseif (not CanEditOfficerNote()) then
+		elseif (not C_GuildInfo.CanEditOfficerNote()) then
 			DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ERROR_NOT_OFFICER);
 		else
 			DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.SYSTEM_STILL_SYNCING1 .. math.floor(syncDelay+0.5) .. L.SYSTEM_STILL_SYNCING3);
@@ -315,21 +315,21 @@ f:RegisterEvent("GUILD_ROSTER_UPDATE");
 C_ChatInfo.RegisterAddonMessagePrefix("RATSYSTEM");
 
 f:SetScript("OnUpdate", function(self, elapsed)
-	if (playersRegister and CanEditOfficerNote()) then
+	if (playersRegister and C_GuildInfo.CanEditOfficerNote()) then
 		ticks = ticks - elapsed;
 	end
-	if (not synced and CanEditOfficerNote()) then
+	if (not synced and C_GuildInfo.CanEditOfficerNote()) then
 		syncDelay = syncDelay - elapsed;
 	end
-	if (syncDelay <= 0 and not synced and CanEditOfficerNote()) then
+	if (syncDelay <= 0 and not synced and C_GuildInfo.CanEditOfficerNote()) then
 		synced = true;
-		GuildRoster();
+		C_GuildInfo.GuildRoster();
 		RAT:Sync();
 		--RAT:CleanAltDb();
 	end
 	lastAntiCheat = lastAntiCheat + elapsed;
 	local time = GetServerTime();
-	if (time > RAT_SavedData.NextAward and RAT_SavedData.NextAward ~= 0 and CanEditOfficerNote()) then
+	if (time > RAT_SavedData.NextAward and RAT_SavedData.NextAward ~= 0 and C_GuildInfo.CanEditOfficerNote()) then
 		local freq = RAT_SavedOptions.Frequency * 60;
 		if (time > RAT_SavedData.NextAward + 60) then --Player is considered late
 			RAT:RecoverNextAward(time);
@@ -371,7 +371,7 @@ f:SetScript("OnUpdate", function(self, elapsed)
 			end
 		end
 	end
-	if (ticks <= 0 and playersRegister and CanEditOfficerNote()) then
+	if (ticks <= 0 and playersRegister and C_GuildInfo.CanEditOfficerNote()) then
 		playersRegister = false;
 		ticks = 0;
 		currentIndex = 0;
@@ -426,7 +426,7 @@ f:SetScript("OnEvent", function(self, event, ...)
 			local args = RAT:Split(arg);
 			local index = RAT:GetGuildMemberIndex(sender);
 			if (arg == "bench") then
-				if (CanEditOfficerNote()) then
+				if (C_GuildInfo.CanEditOfficerNote()) then
 					if (RAT:GetMain(sender)) then
 						local main = RAT:GetMain(sender);
 						sender = main;
@@ -443,7 +443,7 @@ f:SetScript("OnEvent", function(self, event, ...)
 					--Cant Promote
 				end
 			elseif (RAT:GetSize(args) == 2 and args[1] == "alt") then
-				if (CanEditOfficerNote()) then
+				if (C_GuildInfo.CanEditOfficerNote()) then
 					local main = args[2];
 					main = main:gsub("^%l", string.upper);
 					local mainIndex = RAT:GetGuildMemberIndex(main);
@@ -481,19 +481,19 @@ f:SetScript("OnEvent", function(self, event, ...)
 			msg = RAT:Split(msg);
 			local internalPrefix = msg[1];
 			if (internalPrefix and internalPrefix == "BENCH") then
-				if (CanEditOfficerNote()) then
+				if (C_GuildInfo.CanEditOfficerNote()) then
 					local raider = msg[2];
 					if (raider and not RAT:IsBenched(raider)) then
 						RAT_SavedData.Bench[RAT:GetSize(RAT_SavedData.Bench)+1] = raider;
 					end
 				end
 			elseif (internalPrefix and internalPrefix == "GETRANK" and synced) then
-				if (CanEditOfficerNote()) then
+				if (C_GuildInfo.CanEditOfficerNote()) then
 					local sendMsg = "RETURNRANK " .. UnitName("player") .. " " .. select(3, GetGuildInfo("player"));
 					C_ChatInfo.SendAddonMessage("RATSYSTEM", sendMsg, "WHISPER", sender);
 				end
 			elseif (internalPrefix and internalPrefix == "RETURNRANK") then
-				if (CanEditOfficerNote()) then
+				if (C_GuildInfo.CanEditOfficerNote()) then
 					local user = msg[2];
 					local rank = tonumber(msg[3]);
 					if (user and rank) then
@@ -504,16 +504,16 @@ f:SetScript("OnEvent", function(self, event, ...)
 				end
 			elseif (internalPrefix and internalPrefix == "SYNCATTENDANCE") then
 				awaitingSync = true;
-				GuildRoster();
+				C_GuildInfo.GuildRoster();
 			elseif (internalPrefix and internalPrefix == "GETBENCH") then
-				if (CanEditOfficerNote()) then
+				if (C_GuildInfo.CanEditOfficerNote()) then
 					for i, pl in pairs(RAT_SavedData.Bench) do
 						local sendMsg = "RETURNBENCH " .. pl;
 						C_ChatInfo.SendAddonMessage("RATSYSTEM", sendMsg, "WHISPER", sender);
 					end
 				end
 			elseif (internalPrefix and internalPrefix == "RETURNBENCH") then
-				if (CanEditOfficerNote()) then
+				if (C_GuildInfo.CanEditOfficerNote()) then
 					local pl = msg[2];
 					if (not RAT:Contains(RAT_SavedData.Bench, pl)) then
 						RAT_SavedData.Bench[RAT:GetSize(RAT_SavedData.Bench)+1] = pl;
@@ -553,7 +553,7 @@ f:SetScript("OnEvent", function(self, event, ...)
 			]]
 			end
 		end
-	elseif (event == "GUILD_ROSTER_UPDATE" and CanEditOfficerNote()) then
+	elseif (event == "GUILD_ROSTER_UPDATE" and C_GuildInfo.CanEditOfficerNote()) then
 		if (awaitingSync) then
 			awaitingSync = false;
 			RAT:Sync();
@@ -564,7 +564,7 @@ f:SetScript("OnEvent", function(self, event, ...)
 		end
 		--RAT:CleanAltDb();
 	elseif (event == "PLAYER_LOGIN") then
-		if (not CanEditOfficerNote()) then
+		if (not C_GuildInfo.CanEditOfficerNote()) then
 			f:SetScript("OnUpdate", nil);
 		end
 		C_Timer.After(5, function()
@@ -620,7 +620,7 @@ end]]
 
 function RAT:UpdateGuild()
 	awaitingSync = true;
-	GuildRoster();
+	C_GuildInfo.GuildRoster();
 end
 -- local function _CalendarFrame_InviteToRaid(maxInviteCount)
 -- 	local inviteCount = 0;

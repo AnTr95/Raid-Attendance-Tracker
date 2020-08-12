@@ -294,7 +294,7 @@ function RAT:SuggestRaidDays()
 		end
 	end
 	--[[
-	local date = C_Calendar.GetDate();
+	local date = C_DateAndTime.GetCurrentCalendarTime();
 	local realmMonth = date.month;
 	local realmDay = date.monthDay;
 	local realmYear = date.year;
