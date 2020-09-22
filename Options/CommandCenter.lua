@@ -256,7 +256,14 @@ ccOptions:SetScript("OnShow", function()
 	selectedPlayers = {};
 	selectedAction = "Award";
 	amount = 0;
+	amountEditBox:SetText("");
+	local sortedArray = {};
 	for pl, data in pairs(RAT_SavedData.Attendance) do
+		table.insert(sortedArray, pl);
+	end
+	table.sort(sortedArray);
+	for i = 1, #sortedArray do
+		local pl = sortedArray[i];
 		if (not RAT:Contains(plTexts, pl)) then
 			local plText = ccOptions:CreateFontString(nil, "ARTWORK", "GameFontNormal");
 			plText:SetText(pl);

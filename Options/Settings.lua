@@ -161,6 +161,7 @@ punishCalendarCheckButton:SetScript("OnClick", function(self)
 		RAT_SavedOptions.PunishCalendar = false;
 	end
 end);
+punishCalendarCheckButton:Disable();
 
 local minimapModeText = settingsOptions:CreateFontString(nil, "ARTWORK", "GameFontWhite");
 minimapModeText:SetText(L.OPTIONS_MINIMAP_MODE_TEXT);

@@ -372,7 +372,7 @@ normalTexture:SetPoint("TOPLEFT");
 
 local profileTexture = setupFrame:CreateTexture(nil, "BACKGROUND");
 profileTexture:SetDrawLayer("BACKGROUND", 0);
-profileTexture:SetTexture("Interface\\addons\\RaidAttendanceTracker\\Res\\setup.tga");
+profileTexture:SetTexture("Interface\\addons\\RaidAttendanceTrackerClassic\\Res\\setup.tga");
 profileTexture:SetPoint("TOPLEFT",12, -5);
 
 local addonText = setupFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
@@ -696,6 +696,7 @@ punishCalendarCheckButton:SetScript("OnClick", function(self)
 		RAT_SavedOptions.PunishCalendar = false;
 	end
 end);
+punishCalendarCheckButton:Disable();
 punishCalendarCheckButton:Hide();
 
 local minimapModeText = setupFrame:CreateFontString(nil, "ARTWORK", "GameFontWhite");

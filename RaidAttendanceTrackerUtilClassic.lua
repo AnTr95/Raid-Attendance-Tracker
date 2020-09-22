@@ -274,7 +274,6 @@ function RAT:UpdateNote(name, index)
 		local rank = RAT_SavedData.Attendance[name].Rank;
 		--R:99 AP:9999 100% M:999 S9/9
 		GuildRosterSetOfficerNote(index, "R:" .. rank .. " AP:" .. attendance .. " " .. percent .. "%" .. " M:" .. absent .. " S:" .. strikes .. "/3");
-		GuildRosterSetPublicNote(index, "R:" .. rank .. " AP:" .. attendance .. " " .. percent .. "%" .. " M:" .. absent .. " S:" .. strikes .. "/3");
 		if (string.len(select(8,GetGuildRosterInfo(index))) > 31) then
 			DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000" .. L.ADDON .. L.ERROR_OFFICER_NOTE_TOO_LONG1 .. name .. L.ERROR_OFFICER_NOTE_TOO_LONG2);
 		end
@@ -495,7 +494,7 @@ function RAT:GetMain(alt)
 end]]
 function RAT:GetMain(alt)
 	local index = RAT:GetGuildMemberIndex(alt);
-	local note = select(8, GetGuildRosterInfo(index));
+	local note = select(7, GetGuildRosterInfo(index));
 	local mainIndex = RAT:GetGuildMemberIndex(note);
 	if (mainIndex ~= -1 and RAT:Eligible(mainIndex)) then
 		return note;
@@ -552,7 +551,7 @@ function RAT:UpdateAllAlts()
 		if (main) then
 			local mainIndex = RAT:GetGuildMemberIndex(main);
 			local mainNote = select(8, GetGuildRosterInfo(mainIndex));
-			GuildRosterSetPublicNote(index, mainNote);
+			GuildRosterSetOfficerNote(index, mainNote);
 		end
 	end
 end
@@ -565,7 +564,7 @@ function RAT:UpdatePlayerAlts(main)
 		if (itMain == main) then
 			local mainIndex = RAT:GetGuildMemberIndex(main);
 			local mainNote = select(8, GetGuildRosterInfo(mainIndex));
-			GuildRosterSetPublicNote(index, mainNote);
+			GuildRosterSetOfficerNote(index, mainNote);
 		end
 	end
 end

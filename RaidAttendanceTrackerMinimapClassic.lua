@@ -19,7 +19,7 @@ minimapButton:EnableDrawLayer("OVERLAY");
 
 normalTexture = minimapButton:CreateTexture("RAT_MinimapButton_BackgroundTexture", "BACKGROUND");
 normalTexture:SetDrawLayer("BACKGROUND", 0);
-normalTexture:SetTexture("Interface\\addons\\RaidAttendanceTracker\\Res\\minimap.tga");
+normalTexture:SetTexture("Interface\\addons\\RaidAttendanceTrackerClassic\\Res\\minimap.tga");
 normalTexture:SetSize(21,21);
 normalTexture:SetPoint("TOPLEFT", 6, -5);
 
