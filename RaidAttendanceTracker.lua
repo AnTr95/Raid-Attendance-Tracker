@@ -568,7 +568,9 @@ f:SetScript("OnEvent", function(self, event, ...)
 			f:SetScript("OnUpdate", nil);
 		end
 		C_Timer.After(5, function()
-			RAT:CheckForDSTTransition();
+			if (C_GuildInfo.CanEditOfficerNote()) then
+				RAT:CheckForDSTTransition();
+			end
 		end);
 		if (RAT_SavedOptions.MinimapMode == "Always") then
 			RAT_MinimapButton:Show();
