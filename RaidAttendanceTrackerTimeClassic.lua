@@ -45,11 +45,12 @@ function RAT:GetRealmTimeZone()
 	timeInfo.isdst = date("*t").isdst;
 	local weekday, day, month, year, hour, min, sec = weekdays[timeInfo.wday], timeInfo.day, timeInfo.month, timeInfo.year, timeInfo.hour, timeInfo.min, timeInfo.sec;
 	local realmTimeHour, realmTimeMinute = GetGameTime();
+	local realmDate = C_DateAndTime.GetTodaysDate();
 	realmInfo.hour = realmTimeHour;
 	realmInfo.min = realmTimeMinute;
-	realmInfo.day = day;
-	realmInfo.month = month;
-	realmInfo.year = year;
+	realmInfo.day = realmDate.day;
+	realmInfo.month = realmDate.month;
+	realmInfo.year = realmDate.year;
 	return RAT:Round(difftime(time(realmInfo), time(timeInfo))/3600);
 	--[[
 	if (not IsInInstance()) then
