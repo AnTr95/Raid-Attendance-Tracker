@@ -577,7 +577,7 @@ f:SetScript("OnEvent", function(self, event, ...)
 		else
 			RAT_MinimapButton:Hide();
 		end
-		if (not RAT_SavedData.SetupCompleted) then
+		if (not RAT_SavedData.SetupCompleted and IsInGuild()) then
 			RAT:StartSetup();
 		end
 	end
