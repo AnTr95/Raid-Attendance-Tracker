@@ -116,7 +116,7 @@ function RAT:StrikePlayer(playerName, strikes)
 				RAT:InitPlayer(playerName);
 			end
 			RAT_SavedData.Attendance[playerName].Strikes = RAT_SavedData.Attendance[playerName].Strikes + strikes;
-			RAT:UpdateNote(playerName, index);
+			RAT:AddToNoteQueue(playerName, index);
 			--RAT:BroadcastStrike(playerName);
 			RAT:LogStrike(playerName, strikes, tostring(date()));
 		end
@@ -246,7 +246,7 @@ function RAT:PlayerAttended(playerName, attended)
 			RAT_SavedData.Attendance[playerName].Attended = (RAT:GetAttendance(playerName) + attended);
 			RAT_SavedData.Attendance[playerName].Percent = RAT:CalculatePercent(playerName);
 			RAT_SavedData.Attendance[playerName].Score = RAT:CalculateScore(playerName);
-			RAT:UpdateNote(playerName, index);
+			RAT:AddToNoteQueue(playerName, index);
 			RAT:LogAttended(playerName, attended, tostring(date()));
 		end
 	end
@@ -267,7 +267,7 @@ function RAT:PlayerAbsent(playerName, absent)
 			RAT_SavedData.Attendance[playerName].Absent = RAT_SavedData.Attendance[playerName].Absent + absent;
 			RAT_SavedData.Attendance[playerName].Percent = RAT:CalculatePercent(playerName);
 			RAT_SavedData.Attendance[playerName].Score = RAT:CalculateScore(playerName);
-			RAT:UpdateNote(playerName, index);
+			RAT:AddToNoteQueue(playerName, index);
 			RAT:LogAbsent(playerName, absent, tostring(date()));
 		end
 	end
@@ -301,14 +301,14 @@ function RAT:UpdateRank()
 			local previousPerson = RAT_SavedData.Attendance[RAT_SavedData.Ranks[k-1]];
 			if (RAT_SavedData.Attendance[v].Score == previousPerson.Score) then
 				RAT_SavedData.Attendance[v].Rank = previousPerson.Rank;
-				RAT:UpdateNote(v, index);
+				RAT:AddToNoteQueue(v, index);
 			else
 				RAT_SavedData.Attendance[v].Rank = k;
-				RAT:UpdateNote(v, index);
+				RAT:AddToNoteQueue(v, index);
 			end
 		else
 			RAT_SavedData.Attendance[v].Rank = k;
-			RAT:UpdateNote(v, index);
+			RAT:AddToNoteQueue(v, index);
 		end
 	end
 	--RAT:AntiCheat();

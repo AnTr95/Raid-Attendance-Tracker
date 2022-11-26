@@ -11,7 +11,7 @@ minimapButton:EnableMouse(true);
 minimapButton:SetFrameStrata("TOOLTIP");
 minimapButton:SetFrameLevel(8);
 minimapButton:SetClampedToScreen(true);
-minimapButton:SetDontSavePosition();
+minimapButton:SetDontSavePosition(true);
 minimapButton:RegisterForClicks("LeftButtonUp", "RightButtonUp");
 minimapButton:RegisterForDrag("LeftButton", "RightButton");
 minimapButton:EnableDrawLayer("BACKGROUND");
@@ -21,7 +21,7 @@ local normalTexture = minimapButton:CreateTexture("RAT_MinimapButton_BackgroundT
 normalTexture:SetDrawLayer("BACKGROUND", 0);
 normalTexture:SetTexture("Interface\\addons\\RaidAttendanceTracker\\Res\\minimap.tga");
 normalTexture:SetSize(21,21);
-normalTexture:SetPoint("TOPLEFT", 6, -5);
+normalTexture:SetPoint("TOPLEFT", 7, -6);
 
 local highlightTexture = minimapButton:CreateTexture("RAT_MinimapButton_OverlayTexture", "OVERLAY");
 highlightTexture:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder");

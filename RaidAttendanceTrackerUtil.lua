@@ -7,6 +7,7 @@ escapeCodes.SUCCESS = "|cFF00FF00";
 escapeCodes.FAIL = "|cFFFF0000";
 local PAU = {}; --Players Awaiting Update
 local calendarRaidIndex = nil;
+local noteQueue = {};
 
 local GetGuildRosterInfo = GetGuildRosterInfo;
 
@@ -262,6 +263,15 @@ function RAT:GetGuildMemberIndex(name)
 	return -1;
 end
 
+function RAT:AddToNoteQueue(name, index)
+	if (not RAT:Contains(noteQueue)) then
+		table.insert(noteQueue, name);
+	end
+	C_Timer.After(1*#noteQueue, function()
+		RAT:UpdateNote(name, index);
+	end);
+end
+
 function RAT:UpdateNote(name, index)
 	if (not RAT:Contains(PAU, name)) then
 		table.insert(PAU, name);
@@ -278,6 +288,9 @@ function RAT:UpdateNote(name, index)
 		if (string.len(select(8,GetGuildRosterInfo(index))) > 31) then
 			DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000" .. L.ADDON .. L.ERROR_OFFICER_NOTE_TOO_LONG1 .. name .. L.ERROR_OFFICER_NOTE_TOO_LONG2);
 		end
+	end
+	if (RAT:Contains(noteQueue, name)) then
+		table.remove(noteQueue, RAT:Contains(noteQueue, name));
 	end
 end
 
