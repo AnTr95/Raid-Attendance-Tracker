@@ -118,25 +118,27 @@ end
 
 function RAT:AntiCheat()
 	for pl, data in pairs(RAT_SavedData.Attendance) do
-		local index = RAT:GetGuildMemberIndex(pl);
-		local pNote = select(7, GetGuildRosterInfo(index));
-		local oNote = "";
-		if (RAT:GetMain(pl)) then
-			local main = RAT:GetMain(pl);
-			local mainIndex = RAT:GetGuildMemberIndex(main);
-			oNote = select(8, GetGuildRosterInfo(mainIndex));
-		else
-			oNote = select(8, GetGuildRosterInfo(index));
-		end
-		if (oNote ~= pNote) then
-			if (not RAT:Contains(PAU, pl)) then
-				table.insert(PAU, pl);
-				GuildRosterSetPublicNote(index, oNote);
-				DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. L.ERROR_CHEAT_DETECTED1 .. pl .. L.ERROR_CHEAT_DETECTED2 .. oNote .. L.ERROR_CHEAT_DETECTED3 .. pNote .. L.DOT);
+		if (not RAT:Contains(noteQueue, pl)) then
+			local index = RAT:GetGuildMemberIndex(pl);
+			local pNote = select(7, GetGuildRosterInfo(index));
+			local oNote = "";
+			if (RAT:GetMain(pl)) then
+				local main = RAT:GetMain(pl);
+				local mainIndex = RAT:GetGuildMemberIndex(main);
+				oNote = select(8, GetGuildRosterInfo(mainIndex));
+			else
+				oNote = select(8, GetGuildRosterInfo(index));
 			end
-		else
-			if (RAT:Contains(PAU, pl)) then
-				PAU[RAT:Contains(PAU, pl)] = nil;
+			if (oNote ~= pNote) then
+				if (not RAT:Contains(PAU, pl)) then
+					table.insert(PAU, pl);
+					GuildRosterSetPublicNote(index, oNote);
+					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. L.ERROR_CHEAT_DETECTED1 .. pl .. L.ERROR_CHEAT_DETECTED2 .. oNote .. L.ERROR_CHEAT_DETECTED3 .. pNote .. L.DOT);
+				end
+			else
+				if (RAT:Contains(PAU, pl)) then
+					PAU[RAT:Contains(PAU, pl)] = nil;
+				end
 			end
 		end
 	end
