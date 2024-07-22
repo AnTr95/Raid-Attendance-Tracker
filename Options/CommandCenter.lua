@@ -11,10 +11,10 @@ local escapeCodes = {};
 escapeCodes.SUCCESS = "|cFF00FF00";
 escapeCodes.FAIL = "|cFFFF0000";
 
-local ccOptions = CreateFrame("Frame", "RAT_CC_Options", InterfaceOptionsFramePanelContainer);
-ccOptions.name = "Command Center";
-ccOptions.parent = "Raid Attendance Tracker";
+local ccOptions = CreateFrame("Frame");
 ccOptions:Hide();
+
+RAT.OptionsCategories.CommandCenter = Settings.RegisterCanvasLayoutSubcategory(RAT.OptionsCategories.Options, ccOptions, "Command Center");
 
 local addonText = ccOptions:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
 addonText:SetText(L.ADDON_FULL);
@@ -119,7 +119,7 @@ end);
 
 local actionButton = CreateFrame("Button", "RAT_ActionButton", ccOptions, "UIPanelButtonTemplate");
 actionButton:SetSize(80,25);
-actionButton:SetPoint("BOTTOMLEFT", 470, 15);
+actionButton:SetPoint("BOTTOMLEFT", 470, 18);
 actionButton:SetText(L.OPTIONS_ACTION_BUTTON);
 actionButton:SetScript("OnClick", function(self)
 	if(next(selectedPlayers)) then
@@ -173,7 +173,7 @@ actionButton:SetScript("OnClick", function(self)
 		elseif (selectedAction == "Strike") then
 			if (amount ~= 0) then
 				for k, pl in pairs(selectedPlayers) do
-					RAT:PlayerStrike(pl, amount);
+					RAT:StrikePlayer(pl, amount);
 					C_Timer.After(2, function() RAT:UpdatePlayerAlts(pl); end);
 					SendChatMessage(L.ADDON .. pl .. L.BROADCAST_STRIKE_PLAYER1 .. amount .. L.BROADCAST_STRIKE_PLAYER2, "GUILD");
 				end
@@ -183,40 +183,33 @@ actionButton:SetScript("OnClick", function(self)
 	end
 end);
 
-local actionMenu = CreateFrame("Button", nil, ccOptions, "UIDropDownMenuTemplate");
-actionMenu:SetPoint("BOTTOMLEFT", 200, 10);
-
 local actions = {"Award", "Absent", "Bench", "Strike"};
-
-local function actionState_OnClick(self)
-	UIDropDownMenu_SetSelectedID(actionMenu, self:GetID());
-	selectedAction = self:GetText();
-	if (selectedAction == "Bench") then
-		actionButton:Enable();
-	else
-		if (amount ~= 0) then
-			actionButton:Enable();
-		else
-			actionButton:Disable();
-		end
+local function TimeZoneMenuGenerator(owner, rootDescription)
+	for _, action in ipairs(actions) do
+		rootDescription:CreateButton(action, function(data)
+			selectedAction = action;
+			if (selectedAction == "Bench") then
+				actionButton:Enable();
+			else
+				if (amount ~= 0) then
+					actionButton:Enable();
+				else
+					actionButton:Disable();
+				end
+			end
+		end);
 	end
 end
 
-local function Initialize_actionState(self, level)
-	local info = UIDropDownMenu_CreateInfo();
-	for k,v in pairs(actions) do
-		info = UIDropDownMenu_CreateInfo();
-		info.text = v;
-		info.value = v;
-		info.func = actionState_OnClick
-		UIDropDownMenu_AddButton(info, level);
-	end
-end
+local actionMenu = CreateFrame("DropdownButton", nil, ccOptions, "WowStyle1DropdownTemplate");
+actionMenu:SetPoint("BOTTOMLEFT", 220, 15);
+actionMenu:SetWidth(110);
 
-UIDropDownMenu_SetWidth(actionMenu, 110);
-UIDropDownMenu_SetButtonWidth(actionMenu, 110);
-UIDropDownMenu_JustifyText(actionMenu, "CENTER");
-UIDropDownMenu_Initialize(actionMenu, Initialize_actionState);
+actionMenu:SetupMenu(TimeZoneMenuGenerator);
+
+actionMenu:SetSelectionText(function(selections)
+	return selectedAction;
+end);
 
 local actionText = ccOptions:CreateFontString(nil, "ARTWORK", "GameFontHighlight");
 actionText:SetText(L.OPTIONS_ACTION_TEXT);
@@ -246,7 +239,7 @@ end);
 
 local amountText = ccOptions:CreateFontString(nil, "ARTWORK", "GameFontHighlight");
 amountText:SetText(L.OPTIONS_AMOUNT_TEXT);
-amountText:SetPoint("BOTTOMLEFT", amountEditBox, "TOPLEFT", 0, 10);
+amountText:SetPoint("BOTTOMLEFT", amountEditBox, "TOPLEFT", -3, 10);
 
 ccOptions:SetScript("OnShow", function()
 	for key, pl in pairs(selectedPlayers) do
@@ -284,8 +277,7 @@ ccOptions:SetScript("OnShow", function()
 			end);
 		end
 	end
-	Initialize_actionState();
-	UIDropDownMenu_SetSelectedName(actionMenu, actions[1]);
+	actionMenu:SetDefaultText(selectedAction);
 	actionButton:Disable();
 end);
 
@@ -318,7 +310,7 @@ StaticPopupDialogs["RAT_SETUP_BUTTON"] = {
 		RAT_SavedData.SetupCompleted = false;
 		RAT_SavedData.NextAward = 0;
 		RAT:StartSetup();
-		InterfaceOptionsFrame:Hide();
+		SettingsPanel:Hide();
 	end,
 	timeout = 0,
 	whileDead = true,
@@ -393,4 +385,4 @@ StaticPopupDialogs["RAT_DELETE_BUTTON"] = {
 	preferredIndex = 3,  -- avoid some UI taint, see http://www.wowace.com/announcements/how-to-avoid-some-ui-taint/
 };
 
-InterfaceOptions_AddCategory(ccOptions);
+Settings.RegisterAddOnCategory(RAT.OptionsCategories.CommandCenter);

@@ -1,8 +1,10 @@
-## Interface: 100007
+## Interface: 100206
 ## Title: Raid Attendance Tracker
-## Version: 2.9r
+## Version: 3.0r
 ## Author: Ant-Kazzak
 ## Notes: Tracks the attendance of your raiders
+## AddonCompartmentFunc: RAT_OnAddonCompartmentClick
+## IconTexture: Interface\AddOns\RaidAttendanceTracker\Res\minimap3
 ## SavedVariables: RAT_SavedData
 ## SavedVariables: RAT_SavedOptions
 
@@ -13,7 +15,6 @@ Options\RaiderRanks.lua
 Options\Settings.lua
 Options\Help.lua
 Options\CommandCenter.lua
-RaidAttendanceTrackerMinimap.lua
 RaidAttendanceTrackerUtil.lua
 RaidAttendanceTrackerTime.lua
 RaidAttendanceTrackerMath.lua

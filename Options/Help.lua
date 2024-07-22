@@ -3,10 +3,10 @@ local L = RAT_Locals;
 local RAT = RAT;
 local _G = _G;
 
-local helpOptions = CreateFrame("Frame", "RAT_Help_Options", InterfaceOptionsFramePanelContainer);
-helpOptions.name = "Help/Commands";
-helpOptions.parent = "Raid Attendance Tracker";
+local helpOptions = CreateFrame("Frame");
 helpOptions:Hide();
+
+RAT.OptionsCategories.HelpCommands = Settings.RegisterCanvasLayoutSubcategory(RAT.OptionsCategories.Options, helpOptions, "Help/Commands");
 
 local addonText = helpOptions:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
 addonText:SetText(L.ADDON_FULL);
@@ -32,4 +32,4 @@ infoText:SetJustifyV("TOP");
 infoText:SetJustifyH("LEFT");
 infoText:SetSize(520, 420);
 
-InterfaceOptions_AddCategory(helpOptions);
+Settings.RegisterAddOnCategory(RAT.OptionsCategories.HelpCommands);

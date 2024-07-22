@@ -3,6 +3,7 @@
 local RAT = RAT;
 local _G = _G;
 local L = RAT_Locals;
+local isAwardHandOutRunning = false;
 
 local function phi(x)
   -- Ensure 0 <= phi(x) <= 1 :
@@ -147,9 +148,11 @@ end
 function RAT:GetAbsentPlayers(absent)
 	local attending = false;
 	local absentPlayers = {};
+	local count = 0;
 	--local bench = RAT:GetBench()
 	--Main isnt in the raid, alt is will think he is absent
 	if (IsInRaid()) then
+		RAT:SendDebugMessage("Absent players gets " .. absent .. " missed points...");
 		for k, v in pairs(RAT_SavedData.Attendance) do
 			attending = false;
 			for i = 1, GetNumGroupMembers() do
@@ -158,8 +161,8 @@ function RAT:GetAbsentPlayers(absent)
 					local main = RAT:GetMain(pl);
 					if (main) then
 						pl = main;
-						index = RAT:GetGuildMemberIndex(main);
-						isBench = RAT:IsBenched(main);
+						--index = RAT:GetGuildMemberIndex(main);
+						--isBench = RAT:IsBenched(main);
 					end
 				end
 				if (pl == k) then
@@ -176,9 +179,17 @@ function RAT:GetAbsentPlayers(absent)
 			end
 			if (attending == false) then
 				if (not RAT:GetMain(k)) then
-					C_Timer.After(random(0,5)*0.08, function()
+					if (not isAwardHandOutRunning) then
+						isAwardHandOutRunning = true;
+					end
+					C_Timer.After(count*0.06, function()
+						RAT:SendDebugMessage(k .. " is absent and will recieve " .. absent .. " missed points");
 						RAT:PlayerAbsent(k, absent);
+						if (next(RAT_SavedData.Attendance, k) == nil) then
+							isAwardHandOutRunning = false;
+						end
 					end);
+					count = count + 1;
 					absentPlayers[#absentPlayers+1] = k;
 				end
 			end
@@ -190,7 +201,9 @@ function RAT:GetAbsentPlayers(absent)
 	end
 end
 function RAT:AllAttended(attended)
+	local count = 0;
 	if (IsInRaid()) then
+		RAT:SendDebugMessage("Awarding all attending players " .. attended .. " points...");
 		local attendingPlayers = {};
 		--What if main is in the raid
 		--local bench = RAT:GetBench()
@@ -211,10 +224,17 @@ function RAT:AllAttended(attended)
 					RAT:InitPlayer(pl);
 				end
 				if (not isBench and not RAT:Contains(attendingPlayers, pl)) then
-					C_Timer.After(random(0,5)*0.08, function()
+					if (not isAwardHandOutRunning) then
+						isAwardHandOutRunning = true;
+					end
+					C_Timer.After(count*0.06, function()
 						RAT:PlayerAttended(pl, attended);
 						attendingPlayers[#attendingPlayers+1] = pl;
+						if (i == GetNumGroupMembers()) then
+							isAwardHandOutRunning = false;
+						end
 					end);
+					count = count + 1;
 				end
 			end
 		end
@@ -225,13 +245,20 @@ function RAT:AllAttended(attended)
 				if (not RAT:ContainsKey(RAT_SavedData.Attendance, pl)) then
 					RAT:InitPlayer(pl);
 				end
-				C_Timer.After(random(0,5)*0.08, function()
+				if (not isAwardHandOutRunning) then
+					isAwardHandOutRunning = true;
+				end
+				C_Timer.After(count*0.06, function()
 					RAT:PlayerAttended(pl, attended);
 					attendingPlayers[#attendingPlayers+1] = pl;
+					if (i == RAT:GetSize(RAT_SavedData.Bench)) then
+						isAwardHandOutRunning = false;
+					end
 				end);
 			end
 		end
-		C_Timer.After(0.6, function()
+		C_Timer.After(2, function()
+			isAwardHandOutRunning = false;
 			RAT:Broadcast(attended);
 			RAT:GetAbsentPlayers(attended);
 			RAT:UpdateRank();
@@ -290,9 +317,12 @@ function RAT:Undo(lastAttending, lastAbsent, lastAmount)
 	RAT:UpdateRank();
 	SendChatMessage(L.ADDON .. L.BROADCAST_UNDONE_AWARD, "GUILD");
 	RAT:SetLastAmount(-lastAmount);
-	C_Timer.After(2, function() RAT:UpdateAllAlts(); end);
+	C_Timer.After(2.5, function() RAT:UpdateAllAlts(); end);
 end
 
+function RAT:IsAwardHandOutRunning()
+	return isAwardHandOutRunning;
+end
 
 function RAT:GetAttendance(playerName)
 	return RAT_SavedData.Attendance[playerName].Attended;
@@ -308,21 +338,15 @@ function RAT:UpdateRank()
 		if (RAT_SavedData.Ranks[k-1]) then
 			local previousPerson = RAT_SavedData.Attendance[RAT_SavedData.Ranks[k-1]];
 			if (RAT_SavedData.Attendance[v].Score == previousPerson.Score) then
-				C_Timer.After(random(0,5)*0.08, function()
-					RAT_SavedData.Attendance[v].Rank = previousPerson.Rank;
-					RAT:UpdateNote(v, index);
-				end);
+				RAT_SavedData.Attendance[v].Rank = previousPerson.Rank;
+				RAT:UpdateNote(v, index);
 			else
-				C_Timer.After(random(0,5)*0.08, function()
-					RAT_SavedData.Attendance[v].Rank = k;
-					RAT:UpdateNote(v, index);
-				end);
-			end
-		else
-			C_Timer.After(random(0,5)*0.08, function()
 				RAT_SavedData.Attendance[v].Rank = k;
 				RAT:UpdateNote(v, index);
-			end);
+			end
+		else
+			RAT_SavedData.Attendance[v].Rank = k;
+			RAT:UpdateNote(v, index);
 		end
 	end
 	--RAT:AntiCheat();

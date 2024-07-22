@@ -275,6 +275,7 @@ function RAT:IsItRaidFinish()
 	local timeZone = RAT_SavedData.TimeZone or RAT:GetRealmTimeZone();
 	local weekday, day, month, year, hour, min, sec = getRealmTime(timeZone);
 	if (select(2,RAT:GetTimeDifferenceBetweenDays(weekday, weekday, RAT_SavedOptions.RaidTimes[weekday].FinishHour, RAT_SavedOptions.RaidTimes[weekday].FinishMinute, hour, min)) == 7) then
+		RAT:SendDebugMessage("The raid has ended has there is 7 days between " .. weekday .. RAT_SavedOptions.RaidTimes[weekday].FinishHour .. RAT_SavedOptions.RaidTimes[weekday].FinishMinute .. " and " .. weekday .. hour .. min);
 		return true;
 	end
 	return false;
@@ -330,7 +331,7 @@ function RAT:GetTimeDifferenceBetweenDays(prevRaid, nextRaid, prevFinishHour, pr
 	elseif (prevFinishMinute < nextStartMinute) then
 		minuteDiff = nextStartMinute - prevFinishMinute;
 	else
-		minuteDiff = 0	
+		minuteDiff = 0
 	end
 
 	return timeUnitsToSeconds(dayDiff,hourDiff,minuteDiff), dayDiff, hourDiff, minuteDiff;

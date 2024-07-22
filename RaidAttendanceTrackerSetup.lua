@@ -348,7 +348,7 @@ function RAT:GetAllGuildRanks()
 end
 
 ---------------------------------
--------------Assets---------------
+-------------Assets--------------
 ---------------------------------
 
 local setupFrame = CreateFrame("Frame", "RAT_SetupFrame");
@@ -432,42 +432,42 @@ local crossButton = CreateFrame("Button", "RAT_CrossButton", setupFrame, "UIPane
 crossButton:SetSize(33, 33);
 crossButton:SetPoint("TOPRIGHT", -126, -7);
 
-local timeZoneMenu = CreateFrame("Button", "RAT_TimeZoneDropDown", setupFrame, "UIDropDownMenuTemplate");
-timeZoneMenu:SetPoint("TOPLEFT", 200, -370);
+local timeZones = {"UTC+0", "UTC+1", "UTC+2", "UTC+3", "UTC+4", "UTC+5", "UTC+6", "UTC+7", "UTC+8", "UTC+9", "UTC+10", "UTC+11", "UTC+12", "UTC-1", "UTC-2", "UTC-3", "UTC-4", "UTC-5", "UTC-6", "UTC-7", "UTC-8", "UTC-9", "UTC-10", "UTC-11", "UTC-12"};
+local function TimeZoneMenuGenerator(owner, rootDescription)
+	for _, timeZone in ipairs(timeZones) do
+		rootDescription:CreateButton(timeZone, function(data)
+			local prev = RAT_SavedData.TimeZone;
+			RAT_SavedData.TimeZone = string.match(timeZone, "[%-]?[%d]+");
+			if (prev and prev ~= RAT_SavedData.TimeZone and RAT:GetNextRaidDay("Monday")) then
+				RAT:SetNextAward(GetServerTime());
+				RAT:BroadcastNextAward(RAT:FromSecondsToBestUnit(RAT_SavedData.NextAward - GetServerTime()));
+			end
+			if (RAT_SavedData.TimeZone == nil or RAT:GetNextRaidDay("Monday") == nil) then
+				rightButton:Disable();
+			else
+				rightButton:Enable();
+			end
+		end);
+	end
+end
+
+local timeZoneMenu = CreateFrame("DropdownButton", "RAT_TimeZoneDropDown", setupFrame, "WowStyle1DropdownTemplate");
+timeZoneMenu:SetPoint("TOPLEFT", 220, -370);
+timeZoneMenu:SetDefaultText("Select Timezone");
+timeZoneMenu:SetWidth(90);
 timeZoneMenu:Hide();
 
-local timeZones = {"UTC+0", "UTC+1", "UTC+2", "UTC+3", "UTC+4", "UTC+5", "UTC+6", "UTC+7", "UTC+8", "UTC+9", "UTC+10", "UTC+11", "UTC+12", "UTC-1", "UTC-2", "UTC-3", "UTC-4", "UTC-5", "UTC-6", "UTC-7", "UTC-8", "UTC-9", "UTC-10", "UTC-11", "UTC-12"};
+timeZoneMenu:SetupMenu(TimeZoneMenuGenerator);
 
-local function timeZoneMenu_OnClick(self)
-	UIDropDownMenu_SetSelectedID(timeZoneMenu, self:GetID());
-	local prev = RAT_SavedData.TimeZone;
-	RAT_SavedData.TimeZone = string.match(self:GetText(), "[%-]?[%d]+");
-	if (prev and prev ~= RAT_SavedData.TimeZone and RAT:GetNextRaidDay("Monday")) then
-		RAT:SetNextAward(GetServerTime());
-		RAT:BroadcastNextAward(RAT:FromSecondsToBestUnit(RAT_SavedData.NextAward - GetServerTime()));
+timeZoneMenu:SetSelectionText(function(selections)
+	if (RAT_SavedData.TimeZone) then
+		if (string.find(RAT_SavedData.TimeZone, "-")) then
+			return "UTC"..RAT_SavedData.TimeZone;
+		else
+			return "UTC+"..RAT_SavedData.TimeZone;
+		end
 	end
-	if (RAT_SavedData.TimeZone == nil or RAT:GetNextRaidDay("Monday") == nil) then
-		rightButton:Disable();
-	else
-		rightButton:Enable();
-	end
-end
-
-local function Initialize_TimeZoneMenu(self, level)
-	local info = UIDropDownMenu_CreateInfo();
-	for k,v in pairs(timeZones) do
-		info = UIDropDownMenu_CreateInfo();
-		info.text = v;
-		info.value = v;
-		info.func = timeZoneMenu_OnClick
-		UIDropDownMenu_AddButton(info, level);
-	end
-end
-
-UIDropDownMenu_SetWidth(timeZoneMenu, 90);
-UIDropDownMenu_SetButtonWidth(timeZoneMenu, 90);
-UIDropDownMenu_JustifyText(timeZoneMenu, "CENTER");
-UIDropDownMenu_Initialize(timeZoneMenu, Initialize_TimeZoneMenu);
+end);
 
 local scanRTButton = CreateFrame("Button", "RAT_ScanRTButton", setupFrame, "UIMenuButtonStretchTemplate");
 scanRTButton:SetSize(130,50);
@@ -484,9 +484,9 @@ scanRTButton:SetScript("OnClick", function(self)
 		_G[frameFinish]:SetText(data.FinishHour .. ":" .. data.FinishMinute);
 	end
 	if (string.find(RAT_SavedData.TimeZone, "-")) then
-		UIDropDownMenu_SetSelectedName(timeZoneMenu, "UTC"..RAT_SavedData.TimeZone);
+		timeZoneMenu:SetDefaultText("UTC"..RAT_SavedData.TimeZone);
 	else
-		UIDropDownMenu_SetSelectedName(timeZoneMenu, "UTC+"..RAT_SavedData.TimeZone);
+		timeZoneMenu:SetDefaultText("UTC+"..RAT_SavedData.TimeZone);
 	end
 	if (RAT_SavedData.TimeZone == nil or RAT:GetNextRaidDay("Monday") == nil) then
 		rightButton:Disable();
@@ -572,32 +572,25 @@ sortRankHelp:SetScript("OnLeave", function(self)
 end);
 sortRankHelp:Hide();
 
-local sortRankMenu = CreateFrame("Button", "RAT_SortRankDropDown", setupFrame, "UIDropDownMenuTemplate");
-sortRankMenu:SetPoint("TOPLEFT", 200, -165);
-sortRankMenu:Hide();
-
 local rankAlgos = {"RAT-Algorithm", "Highest Percent", "Most Points"};
-
-local function sortRankState_OnClick(self)
-	UIDropDownMenu_SetSelectedID(sortRankMenu, self:GetID());
-	RAT_SavedOptions.RankingAlgo = self:GetText();
-end
-
-local function Initialize_SortRankState(self, level)
-	local info = UIDropDownMenu_CreateInfo();
-	for k,v in pairs(rankAlgos) do
-		info = UIDropDownMenu_CreateInfo();
-		info.text = v;
-		info.value = v;
-		info.func = sortRankState_OnClick
-		UIDropDownMenu_AddButton(info, level);
+local function AlgoMenuGenerator(owner, rootDescription)
+	for _, algo in ipairs(rankAlgos) do
+		rootDescription:CreateButton(algo, function(data)
+			RAT_SavedOptions.RankingAlgo = algo;
+		end);
 	end
 end
 
-UIDropDownMenu_SetWidth(sortRankMenu, 110);
-UIDropDownMenu_SetButtonWidth(sortRankMenu, 110);
-UIDropDownMenu_JustifyText(sortRankMenu, "CENTER");
-UIDropDownMenu_Initialize(sortRankMenu, Initialize_SortRankState);
+local sortRankMenu = CreateFrame("DropdownButton", "RAT_SortRankDropDown", setupFrame, "WowStyle1DropdownTemplate");
+sortRankMenu:SetPoint("TOPLEFT", 215, -165);
+sortRankMenu:SetWidth(110);
+sortRankMenu:Hide();
+
+sortRankMenu:SetupMenu(AlgoMenuGenerator);
+
+sortRankMenu:SetSelectionText(function(selections)
+	return RAT_SavedOptions.RankingAlgo;
+end);
 
 local frequencyText = setupFrame:CreateFontString(nil, "ARTWORK", "GameFontWhite");
 frequencyText:SetPoint("TOPLEFT", 60, -205);
@@ -697,45 +690,45 @@ punishCalendarCheckButton:SetScript("OnClick", function(self)
 	end
 end);
 punishCalendarCheckButton:Hide();
+--[[
+	local minimapModeText = setupFrame:CreateFontString(nil, "ARTWORK", "GameFontWhite");
+	minimapModeText:SetText(L.OPTIONS_MINIMAP_MODE_TEXT);
+	minimapModeText:SetPoint("TOPLEFT", 60, -295);
+	minimapModeText:Hide();
 
-local minimapModeText = setupFrame:CreateFontString(nil, "ARTWORK", "GameFontWhite");
-minimapModeText:SetText(L.OPTIONS_MINIMAP_MODE_TEXT);
-minimapModeText:SetPoint("TOPLEFT", 60, -295);
-minimapModeText:Hide();
+	local minimapStateMenu = CreateFrame("Button", "RAT_MinimapStateDropDown", setupFrame, "UIDropDownMenuTemplate");
+	minimapStateMenu:SetPoint("TOPLEFT", 200, -285);
+	minimapStateMenu:Hide();
 
-local minimapStateMenu = CreateFrame("Button", "RAT_MinimapStateDropDown", setupFrame, "UIDropDownMenuTemplate");
-minimapStateMenu:SetPoint("TOPLEFT", 200, -285);
-minimapStateMenu:Hide();
+	local minimapStates = {"Always", "On Hover", "Never"};
 
-local minimapStates = {"Always", "On Hover", "Never"};
-
-local function minimapState_OnClick(self)
-	UIDropDownMenu_SetSelectedID(minimapStateMenu, self:GetID());
-	local state = self:GetText();
-	RAT_SavedOptions.MinimapMode = state;
-	if (state == "Always") then
-		RAT_MinimapButton:Show();
-	else
-		RAT_MinimapButton:Hide();
+	local function minimapState_OnClick(self)
+		UIDropDownMenu_SetSelectedID(minimapStateMenu, self:GetID());
+		local state = self:GetText();
+		RAT_SavedOptions.MinimapMode = state;
+		if (state == "Always") then
+			RAT_MinimapButton:Show();
+		else
+			RAT_MinimapButton:Hide();
+		end
 	end
-end
 
-local function Initialize_MinimapState(self, level)
-	local info = UIDropDownMenu_CreateInfo()
-	for k,v in pairs(minimapStates) do
-	  info = UIDropDownMenu_CreateInfo()
-	  info.text = v
-	  info.value = v
-	  info.func = minimapState_OnClick
-	  UIDropDownMenu_AddButton(info, level)
+	local function Initialize_MinimapState(self, level)
+		local info = UIDropDownMenu_CreateInfo()
+		for k,v in pairs(minimapStates) do
+			info = UIDropDownMenu_CreateInfo()
+			info.text = v
+			info.value = v
+			info.func = minimapState_OnClick
+			UIDropDownMenu_AddButton(info, level)
+		end
 	end
-end
 
-UIDropDownMenu_SetWidth(minimapStateMenu, 110)
-UIDropDownMenu_SetButtonWidth(minimapStateMenu, 110)
-UIDropDownMenu_JustifyText(minimapStateMenu, "CENTER")
-UIDropDownMenu_Initialize(minimapStateMenu, Initialize_MinimapState)
-
+	UIDropDownMenu_SetWidth(minimapStateMenu, 110)
+	UIDropDownMenu_SetButtonWidth(minimapStateMenu, 110)
+	UIDropDownMenu_JustifyText(minimapStateMenu, "CENTER")
+	UIDropDownMenu_Initialize(minimapStateMenu, Initialize_MinimapState)	
+]]
 local function initRTFrames()
 	local weekdays = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
 	if (not rtFrames) then
@@ -1004,8 +997,8 @@ local function hideAll()
 	sortRankHelp:Hide();
 	timeZoneText:Hide();
 	timeZoneMenu:Hide();
-	minimapModeText:Hide();
-	minimapStateMenu:Hide();
+	--minimapModeText:Hide();
+	--minimapStateMenu:Hide();
 end
 
 function RAT:OpenSetupPage(page)
@@ -1027,13 +1020,12 @@ function RAT:OpenSetupPage(page)
 		dayText:Show();
 		showRTFrames();
 		timeZoneText:Show();
-		Initialize_TimeZoneMenu();
-		UIDropDownMenu_SetSelectedName(timeZoneMenu, "Select Timezone");
-		if (RAT_SavedData.TimeZone) then 
+		timeZoneMenu:SetDefaultText("Select Timezone");
+		if (RAT_SavedData.TimeZone) then
 			if (string.find(RAT_SavedData.TimeZone, "-")) then
-				UIDropDownMenu_SetSelectedName(timeZoneMenu, "UTC"..RAT_SavedData.TimeZone);
+				timeZoneMenu:SetDefaultText("UTC"..RAT_SavedData.TimeZone);
 			else
-				UIDropDownMenu_SetSelectedName(timeZoneMenu, "UTC+"..RAT_SavedData.TimeZone);
+				timeZoneMenu:SetDefaultText("UTC+"..RAT_SavedData.TimeZone);
 			end
 		end
 		timeZoneMenu:Show();
@@ -1070,14 +1062,13 @@ function RAT:OpenSetupPage(page)
 		sortRankMenu:Show();
 		sortRankText:Show();
 		frequencyEditBox:SetText(tonumber(RAT_SavedOptions.Frequency));
-		Initialize_SortRankState();
-		UIDropDownMenu_SetSelectedName(sortRankMenu, RAT_SavedOptions.RankingAlgo);
+		sortRankMenu:SetDefaultText(RAT_SavedOptions.RankingAlgo);
 		awardStartCheckButton:SetChecked(RAT_SavedOptions.AwardStart);
 		punishCalendarCheckButton:SetChecked(RAT_SavedOptions.PunishCalendar);
-		minimapModeText:Show();
-		minimapStateMenu:Show();
-		Initialize_MinimapState();
-		UIDropDownMenu_SetSelectedName(minimapStateMenu, RAT_SavedOptions.MinimapMode);
+		--minimapModeText:Show();
+		--minimapStateMenu:Show();
+		--Initialize_MinimapState();
+		--UIDropDownMenu_SetSelectedName(minimapStateMenu, RAT_SavedOptions.MinimapMode);
 	elseif (page == 5) then
 		rightButton:SetText(L.OPTIONS_RIGHT_BUTTON);
 		title:SetText(L.OPTIONS_SETUP_COMPLETED_TITLE);
@@ -1115,7 +1106,6 @@ function RAT:StartSetup()
 	RAT:UpdateGuild();
 	setupFrame:Show();
 	initRTFrames();
-	Initialize_SortRankState();
 	page = 1;
 	RAT:OpenSetupPage(page);
 end

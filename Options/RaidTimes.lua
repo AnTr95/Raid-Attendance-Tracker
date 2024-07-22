@@ -4,10 +4,10 @@ local RAT = RAT;
 local _G = _G;
 local rtFrames = nil;
 
-local rtOptions = CreateFrame("Frame", "RAT_RT_Options", InterfaceOptionsFramePanelContainer);
-rtOptions.name = "Raid Times Settings";
-rtOptions.parent = "Raid Attendance Tracker";
+local rtOptions = CreateFrame("Frame");
 rtOptions:Hide();
+
+RAT.OptionsCategories.RaidTimes = Settings.RegisterCanvasLayoutSubcategory(RAT.OptionsCategories.Options, rtOptions, "Raid Times Settings");
 
 local addonText = rtOptions:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
 addonText:SetText(L.ADDON_FULL);
@@ -33,36 +33,36 @@ infoText:SetJustifyV("TOP");
 infoText:SetJustifyH("LEFT");
 infoText:SetSize(520, 320);
 
-local timeZoneMenu = CreateFrame("Button", nil, rtOptions, "UIDropDownMenuTemplate");
-timeZoneMenu:SetPoint("TOPLEFT", 200, -370);
-
 local timeZones = {"UTC+0", "UTC+1", "UTC+2", "UTC+3", "UTC+4", "UTC+5", "UTC+6", "UTC+7", "UTC+8", "UTC+9", "UTC+10", "UTC+11", "UTC+12", "UTC-1", "UTC-2", "UTC-3", "UTC-4", "UTC-5", "UTC-6", "UTC-7", "UTC-8", "UTC-9", "UTC-10", "UTC-11", "UTC-12"};
-
-local function timeZoneMenu_OnClick(self)
-	UIDropDownMenu_SetSelectedID(timeZoneMenu, self:GetID());
-	local prev = RAT_SavedData.TimeZone;
-	RAT_SavedData.TimeZone = string.match(self:GetText(), "[%-]?[%d]+");
-	if (prev and prev ~= RAT_SavedData.TimeZone) then
-		RAT:SetNextAward(GetServerTime());
-		RAT:BroadcastNextAward(RAT:FromSecondsToBestUnit(RAT_SavedData.NextAward - GetServerTime()));
+local function TimeZoneMenuGenerator(owner, rootDescription)
+	for _, timeZone in ipairs(timeZones) do
+		rootDescription:CreateButton(timeZone, function(data)
+			local prev = RAT_SavedData.TimeZone;
+			RAT_SavedData.TimeZone = string.match(timeZone, "[%-]?[%d]+");
+			if (prev and prev ~= RAT_SavedData.TimeZone) then
+				RAT:SetNextAward(GetServerTime());
+				RAT:BroadcastNextAward(RAT:FromSecondsToBestUnit(RAT_SavedData.NextAward - GetServerTime()));
+			end
+		end);
 	end
 end
 
-local function Initialize_TimeZoneMenu(self, level)
-	local info = UIDropDownMenu_CreateInfo();
-	for k,v in pairs(timeZones) do
-		info = UIDropDownMenu_CreateInfo();
-		info.text = v;
-		info.value = v;
-		info.func = timeZoneMenu_OnClick
-		UIDropDownMenu_AddButton(info, level);
-	end
-end
+local timeZoneMenu = CreateFrame("DropdownButton", nil, rtOptions, "WowStyle1DropdownTemplate");
+timeZoneMenu:SetPoint("TOPLEFT", 220, -370);
+timeZoneMenu:SetDefaultText("Select Timezone");
+timeZoneMenu:SetWidth(90);
 
-UIDropDownMenu_SetWidth(timeZoneMenu, 90);
-UIDropDownMenu_SetButtonWidth(timeZoneMenu, 90);
-UIDropDownMenu_JustifyText(timeZoneMenu, "CENTER");
-UIDropDownMenu_Initialize(timeZoneMenu, Initialize_TimeZoneMenu);
+timeZoneMenu:SetupMenu(TimeZoneMenuGenerator);
+
+timeZoneMenu:SetSelectionText(function(selections)
+	if (RAT_SavedData.TimeZone) then
+		if (string.find(RAT_SavedData.TimeZone, "-")) then
+			return "UTC"..RAT_SavedData.TimeZone;
+		else
+			return "UTC+"..RAT_SavedData.TimeZone;
+		end
+	end
+end);
 
 local scanRTButton = CreateFrame("Button", nil, rtOptions, "UIMenuButtonStretchTemplate");
 scanRTButton:SetSize(130,50);
@@ -71,17 +71,12 @@ scanRTButton:SetText(L.OPTIONS_SCAN_RT_BUTTON);
 scanRTButton:SetScript("OnClick", function(self)
 	local raidDays = RAT:SuggestRaidDays();
 	RAT_SavedData.TimeZone = RAT:GetRealmTimeZone();
-	for day, data in pairs(raidDays) do 
+	for day, data in pairs(raidDays) do
 		RAT:AddRaidDay(day, tonumber(data.StartHour), tonumber(data.StartMinute), tonumber(data.FinishHour), tonumber(data.FinishMinute));
 		local frameStart = "RAT_RTO_Start_" .. day;
 		local frameFinish = "RAT_RTO_Finish_" .. day;
 		_G[frameStart]:SetText(data.StartHour .. ":" .. data.StartMinute);
 		_G[frameFinish]:SetText(data.FinishHour .. ":" .. data.FinishMinute);
-	end
-	if (string.find(RAT_SavedData.TimeZone, "-")) then
-		UIDropDownMenu_SetSelectedName(timeZoneMenu, "UTC"..RAT_SavedData.TimeZone);
-	else
-		UIDropDownMenu_SetSelectedName(timeZoneMenu, "UTC+"..RAT_SavedData.TimeZone);
 	end
 	self:Hide();
 end);
@@ -301,14 +296,13 @@ end
 
 rtOptions:SetScript("OnShow", function()
 	showRTFrames();
-	Initialize_TimeZoneMenu();
-	if (RAT_SavedData.TimeZone) then 
+	if (RAT_SavedData.TimeZone) then
 		if (string.find(RAT_SavedData.TimeZone, "-")) then
-			UIDropDownMenu_SetSelectedName(timeZoneMenu, "UTC"..RAT_SavedData.TimeZone);
+			timeZoneMenu:SetDefaultText("UTC"..RAT_SavedData.TimeZone);
 		else
-			UIDropDownMenu_SetSelectedName(timeZoneMenu, "UTC+"..RAT_SavedData.TimeZone);
+			timeZoneMenu:SetDefaultText("UTC+"..RAT_SavedData.TimeZone);
 		end
 	end
 end);
 
-InterfaceOptions_AddCategory(rtOptions);
+Settings.RegisterAddOnCategory(RAT.OptionsCategories.RaidTimes);
