@@ -25,6 +25,8 @@
         "EJ_ContentTab_SetEnabled",
         "EncounterJournal",
         "ChatTypeInfo",
-        "BattlefieldMapFrame"
+        "BattlefieldMapFrame",
+        "Settings",
+        "SettingsPanel"
     ]
 }

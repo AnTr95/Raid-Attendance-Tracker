@@ -355,7 +355,7 @@ f:SetScript("OnUpdate", function(self, elapsed)
 	local time = GetServerTime();
 	if (time > RAT_SavedData.NextAward and RAT_SavedData.NextAward ~= 0 and C_GuildInfo.CanEditOfficerNote()) then
 		local freq = RAT_SavedOptions.Frequency * 60;
-		if (time > RAT_SavedData.NextAward + 60) then --User is considered late
+		if (time > RAT_SavedData.NextAward + 60) then --Player is considered late
 			RAT:SendDebugMessage("The time for NextAward: " .. RAT_SavedData.NextAward .. " has passed as time is: " .. time .. " but the player is considered late causing no rewards to be given out and calculating when the next reward should be... Also requesting the bench from other addon users.");
 			RAT:RecoverNextAward(time);
 			RAT:BroadcastNextAward(RAT:FromSecondsToBestUnit(RAT_SavedData.NextAward-time));
@@ -438,9 +438,6 @@ f:SetScript("OnEvent", function(self, event, ...)
 			if (RAT_SavedOptions.RankingAlgo == nil) then RAT_SavedOptions.RankingAlgo = "RAT-Algorithm"; end
 			if (RAT_SavedOptions.PunishCalendar == nil) then RAT_SavedOptions.PunishCalendar = false; end
 			if (RAT_SavedOptions.RaiderRanks == nil) then RAT_SavedOptions.RaiderRanks = {}; end
-			if (RAT_SavedOptions.MinimapDegree == nil) then RAT_SavedOptions.MinimapDegree = 30; end
-			if (RAT_SavedOptions.MinimapDegree) then RAT:SetMinimapPoint(RAT_SavedOptions.MinimapDegree); end
-			if (RAT_SavedOptions.MinimapMode == nil) then RAT_SavedOptions.MinimapMode = "Always"; end
 			if (RAT_SavedOptions.Debug == nil) then RAT_SavedOptions.Debug = false; end
 		end
 	elseif (event == "CHAT_MSG_RAID" or event == "CHAT_MSG_RAID_LEADER") then
@@ -609,11 +606,13 @@ f:SetScript("OnEvent", function(self, event, ...)
 				RAT:CheckForDSTTransition();
 			end
 		end);
-		if (RAT_SavedOptions.MinimapMode == "Always") then
-			RAT_MinimapButton:Show();
-		else
-			RAT_MinimapButton:Hide();
-		end
+		--[[
+			if (RAT_SavedOptions.MinimapMode == "Always") then
+				RAT_MinimapButton:Show();
+			else
+				RAT_MinimapButton:Hide();
+			end
+		]]
 		if (not RAT_SavedData.SetupCompleted and IsInGuild()) then
 			RAT:StartSetup();
 		end
@@ -722,21 +721,24 @@ local function benchFilterSend(self, event, msg)
 	return false;
 end
 
-ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", benchFilterRecieve)
-ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", helpFilterRecieve)
-ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", altFilterRecieve)
-ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", helpFilterSend)
-ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", altFilterSend)
-ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", benchFilterSend)
+ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", benchFilterRecieve);
+ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", helpFilterRecieve);
+ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", altFilterRecieve);
+ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", helpFilterSend);
+ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", altFilterSend);
+ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", benchFilterSend);
 
-local options = CreateFrame("Frame", nil, InterfaceOptionsFramePanelContainer);
-options.name = "Raid Attendance Tracker";
+local options = CreateFrame("Frame");
 options:Hide();
-options:SetScript("OnShow", function(self)
-	InterfaceOptionsFrame_OpenToCategory(RAT_RT_Options);
-end);
 
-InterfaceOptions_AddCategory(options);
+RAT.OptionsCategories = {};
+RAT.OptionsCategories.Options = Settings.RegisterCanvasLayoutCategory(options, "Raid Attendance Tracker");
+RAT.OptionsCategories.Options.ID = "RATOptions";
+Settings.RegisterAddOnCategory(RAT.OptionsCategories.Options);
+
+function RAT_OnAddonCompartmentClick(addonName, buttonName)
+	Settings.OpenToCategory(RAT.OptionsCategories.Options:GetID());
+end
 
 --------------------------
 ------Blizzard Taint------

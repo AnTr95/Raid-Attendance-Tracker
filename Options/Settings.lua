@@ -3,10 +3,10 @@ local L = RAT_Locals;
 local RAT = RAT;
 local _G = _G;
 
-local settingsOptions = CreateFrame("Frame", "RAT_Settings_Options", InterfaceOptionsFramePanelContainer);
-settingsOptions.name = "Settings";
-settingsOptions.parent = "Raid Attendance Tracker";
+local settingsOptions = CreateFrame("Frame");
 settingsOptions:Hide();
+
+RAT.OptionsCategories.Settings = Settings.RegisterCanvasLayoutSubcategory(RAT.OptionsCategories.Options, settingsOptions, "Settings");
 
 local addonText = settingsOptions:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
 addonText:SetText(L.ADDON_FULL);
@@ -47,31 +47,24 @@ sortRankHelp:SetScript("OnLeave", function(self)
 	GameTooltip:Hide();
 end);
 
-local sortRankMenu = CreateFrame("Button", nil, settingsOptions, "UIDropDownMenuTemplate");
-sortRankMenu:SetPoint("TOPLEFT", 200, -165);
-
 local rankAlgos = {"RAT-Algorithm", "Highest Percent", "Most Points"};
-
-local function sortRankState_OnClick(self)
-	UIDropDownMenu_SetSelectedID(sortRankMenu, self:GetID());
-	RAT_SavedOptions.RankingAlgo = self:GetText();
-end
-
-local function Initialize_SortRankState(self, level)
-	local info = UIDropDownMenu_CreateInfo();
-	for k,v in pairs(rankAlgos) do
-		info = UIDropDownMenu_CreateInfo();
-		info.text = v;
-		info.value = v;
-		info.func = sortRankState_OnClick
-		UIDropDownMenu_AddButton(info, level);
+local function TimeZoneMenuGenerator(owner, rootDescription)
+	for _, algo in ipairs(rankAlgos) do
+		rootDescription:CreateButton(algo, function(data)
+			RAT_SavedOptions.RankingAlgo = algo;
+		end);
 	end
 end
 
-UIDropDownMenu_SetWidth(sortRankMenu, 110);
-UIDropDownMenu_SetButtonWidth(sortRankMenu, 110);
-UIDropDownMenu_JustifyText(sortRankMenu, "CENTER");
-UIDropDownMenu_Initialize(sortRankMenu, Initialize_SortRankState);
+local sortRankMenu = CreateFrame("DropdownButton", nil, settingsOptions, "WowStyle1DropdownTemplate");
+sortRankMenu:SetPoint("TOPLEFT", 208, -165);
+sortRankMenu:SetWidth(110);
+
+sortRankMenu:SetupMenu(TimeZoneMenuGenerator);
+
+sortRankMenu:SetSelectionText(function(selections)
+	return RAT_SavedOptions.RankingAlgo;
+end);
 
 local frequencyText = settingsOptions:CreateFontString(nil, "ARTWORK", "GameFontWhite");
 frequencyText:SetPoint("TOPLEFT", 60, -205);
@@ -161,51 +154,51 @@ punishCalendarCheckButton:SetScript("OnClick", function(self)
 		RAT_SavedOptions.PunishCalendar = false;
 	end
 end);
+--[[
+	local minimapModeText = settingsOptions:CreateFontString(nil, "ARTWORK", "GameFontWhite");
+	minimapModeText:SetText(L.OPTIONS_MINIMAP_MODE_TEXT);
+	minimapModeText:SetPoint("TOPLEFT", 60, -295);
 
-local minimapModeText = settingsOptions:CreateFontString(nil, "ARTWORK", "GameFontWhite");
-minimapModeText:SetText(L.OPTIONS_MINIMAP_MODE_TEXT);
-minimapModeText:SetPoint("TOPLEFT", 60, -295);
+	local minimapStateMenu = CreateFrame("Button", nil, settingsOptions, "UIDropDownMenuTemplate");
+	minimapStateMenu:SetPoint("TOPLEFT", 200, -285);
 
-local minimapStateMenu = CreateFrame("Button", nil, settingsOptions, "UIDropDownMenuTemplate");
-minimapStateMenu:SetPoint("TOPLEFT", 200, -285);
+	local minimapStates = {"Always", "On Hover", "Never"};
 
-local minimapStates = {"Always", "On Hover", "Never"};
-
-local function minimapState_OnClick(self)
-	UIDropDownMenu_SetSelectedID(minimapStateMenu, self:GetID());
-	local state = self:GetText();
-	RAT_SavedOptions.MinimapMode = state;
-	if (state == "Always") then
-		RAT_MinimapButton:Show();
-	else
-		RAT_MinimapButton:Hide();
+	local function minimapState_OnClick(self)
+		UIDropDownMenu_SetSelectedID(minimapStateMenu, self:GetID());
+		local state = self:GetText();
+		RAT_SavedOptions.MinimapMode = state;
+		if (state == "Always") then
+			RAT_MinimapButton:Show();
+		else
+			RAT_MinimapButton:Hide();
+		end
 	end
-end
 
-local function Initialize_MinimapState(self, level)
-	local info = UIDropDownMenu_CreateInfo()
-	for k,v in pairs(minimapStates) do
-	  info = UIDropDownMenu_CreateInfo()
-	  info.text = v
-	  info.value = v
-	  info.func = minimapState_OnClick
-	  UIDropDownMenu_AddButton(info, level)
+	local function Initialize_MinimapState(self, level)
+		local info = UIDropDownMenu_CreateInfo()
+		for k,v in pairs(minimapStates) do
+			info = UIDropDownMenu_CreateInfo()
+			info.text = v
+			info.value = v
+			info.func = minimapState_OnClick
+			UIDropDownMenu_AddButton(info, level)
+		end
 	end
-end
 
-UIDropDownMenu_SetWidth(minimapStateMenu, 110)
-UIDropDownMenu_SetButtonWidth(minimapStateMenu, 110)
-UIDropDownMenu_JustifyText(minimapStateMenu, "CENTER")
-UIDropDownMenu_Initialize(minimapStateMenu, Initialize_MinimapState)
+	UIDropDownMenu_SetWidth(minimapStateMenu, 110)
+	UIDropDownMenu_SetButtonWidth(minimapStateMenu, 110)
+	UIDropDownMenu_JustifyText(minimapStateMenu, "CENTER")
+	UIDropDownMenu_Initialize(minimapStateMenu, Initialize_MinimapState)
+]]
 
 settingsOptions:SetScript("OnShow", function()
-	Initialize_SortRankState();
-	UIDropDownMenu_SetSelectedName(sortRankMenu, RAT_SavedOptions.RankingAlgo);
+	sortRankMenu:SetDefaultText(RAT_SavedOptions.RankingAlgo);
 	punishCalendarCheckButton:SetChecked(RAT_SavedOptions.PunishCalendar);
 	awardStartCheckButton:SetChecked(RAT_SavedOptions.AwardStart);
 	frequencyEditBox:SetText(RAT_SavedOptions.Frequency);
-	Initialize_MinimapState();
-	UIDropDownMenu_SetSelectedName(minimapStateMenu, RAT_SavedOptions.MinimapMode);
+	--Initialize_MinimapState();
+	--UIDropDownMenu_SetSelectedName(minimapStateMenu, RAT_SavedOptions.MinimapMode);
 end);
 
-InterfaceOptions_AddCategory(settingsOptions);
+Settings.RegisterAddOnCategory(RAT.OptionsCategories.Settings);

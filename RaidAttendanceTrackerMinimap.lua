@@ -32,7 +32,7 @@ minimapButton:SetScript("OnClick", function(self)
 	if (self.dragging) then
 		self:SetScript("OnUpdate", nil);
 	end
-	InterfaceOptionsFrame_OpenToCategory(RAT_RT_Options);
+	Settings.OpenToCategory(RAT.OptionsCategories.Options:GetID());
 end);
 minimapButton:SetScript("OnDragStart", function(self)
 	self:LockHighlight();

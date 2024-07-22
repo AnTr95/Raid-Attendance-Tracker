@@ -4,10 +4,10 @@ local RAT = RAT;
 local _G = _G;
 local rrFrames = nil;
 
-local rrOptions = CreateFrame("Frame", "RAT_RR_Options", InterfaceOptionsFramePanelContainer);
-rrOptions.name = "Raider Ranks Settings";
-rrOptions.parent = "Raid Attendance Tracker";
+local rrOptions = CreateFrame("Frame");
 rrOptions:Hide();
+
+RAT.OptionsCategories.RaiderRanks = Settings.RegisterCanvasLayoutSubcategory(RAT.OptionsCategories.Options, rrOptions, "Raider Ranks Settings");
 
 local addonText = rrOptions:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
 addonText:SetText(L.ADDON_FULL);
@@ -119,4 +119,4 @@ rrOptions:SetScript("OnHide", function()
 	RAT:Sync();
 end);
 
-InterfaceOptions_AddCategory(rrOptions);
+Settings.RegisterAddOnCategory(RAT.OptionsCategories.RaiderRanks);
