@@ -118,27 +118,25 @@ end
 
 function RAT:AntiCheat()
 	for pl, data in pairs(RAT_SavedData.Attendance) do
-		if (not RAT:Contains(noteQueue, pl)) then
-			local index = RAT:GetGuildMemberIndex(pl);
-			local pNote = select(7, GetGuildRosterInfo(index));
-			local oNote = "";
-			if (RAT:GetMain(pl)) then
-				local main = RAT:GetMain(pl);
-				local mainIndex = RAT:GetGuildMemberIndex(main);
-				oNote = select(8, GetGuildRosterInfo(mainIndex));
-			else
-				oNote = select(8, GetGuildRosterInfo(index));
+		local index = RAT:GetGuildMemberIndex(pl);
+		local pNote = select(7, GetGuildRosterInfo(index));
+		local oNote = "";
+		if (RAT:GetMain(pl)) then
+			local main = RAT:GetMain(pl);
+			local mainIndex = RAT:GetGuildMemberIndex(main);
+			oNote = select(8, GetGuildRosterInfo(mainIndex));
+		else
+			oNote = select(8, GetGuildRosterInfo(index));
+		end
+		if (oNote ~= pNote) then
+			if (not RAT:Contains(PAU, pl)) then
+				table.insert(PAU, pl);
+				GuildRosterSetPublicNote(index, oNote);
+				DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. L.ERROR_CHEAT_DETECTED1 .. pl .. L.ERROR_CHEAT_DETECTED2 .. oNote .. L.ERROR_CHEAT_DETECTED3 .. pNote .. L.DOT);
 			end
-			if (oNote ~= pNote) then
-				if (not RAT:Contains(PAU, pl)) then
-					table.insert(PAU, pl);
-					GuildRosterSetPublicNote(index, oNote);
-					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. L.ERROR_CHEAT_DETECTED1 .. pl .. L.ERROR_CHEAT_DETECTED2 .. oNote .. L.ERROR_CHEAT_DETECTED3 .. pNote .. L.DOT);
-				end
-			else
-				if (RAT:Contains(PAU, pl)) then
-					PAU[RAT:Contains(PAU, pl)] = nil;
-				end
+		else
+			if (RAT:Contains(PAU, pl)) then
+				PAU[RAT:Contains(PAU, pl)] = nil;
 			end
 		end
 	end
@@ -393,36 +391,51 @@ end
 
 function RAT:Sync()
 	--Read all notes and override RAT_SavedData.Attendance and RAT_SavedData.Ranks
+	--Points of improvement: index is redundant and equal to i? Secondly thescore is being updated constantly instead of after the entire loop is done
 	RAT_SavedData.Attendance = {};
 	RAT_SavedData.Ranks = {};
+	RAT:SendDebugMessage("Syncing database with current notes. Iterating on all guild members...");
 	for i = 1, GetNumGuildMembers() do
 		local name = Ambiguate(select(1, GetGuildRosterInfo(i)), "short");
 		if (RAT:Eligible(i) and not RAT:GetMain(name)) then
 			local note = select(8, GetGuildRosterInfo(i));
+			if (note) then
+				RAT:SendDebugMessage("Iterating... at: " .. name .. " with at index: " .. i .. " and note is: " .. note);
+			else
+				RAT:SendDebugMessage("Iterating... at: " .. name .. " with at index: " .. i .. " and note is nil ");
+			end
 			local index = RAT:GetGuildMemberIndex(name);
 			if (not note:find("R:") or not note:find("AP:") or not note:find("M:") or not note:find("S:") or not note:find("%%")) then
 				GuildRosterSetOfficerNote(index, "");
 				note = "";
 				DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000" .. L.ADDON .. name .. L.ERROR_NOTE_SYNTAX);
+				RAT:SendDebugMessage("The note of " .. name .. " is corrupted and is being reset");
 			end
 			RAT:InitPlayer(name);
 			local vars = RAT:Split(note);
 			for k, v in pairs(vars) do
+				RAT:SendDebugMessage("Note of " .. name .. " has been split and is being iterated over at: " .. v);
 				local indexOf = v:find(":");
 				if (v:find("R:")) then
 					RAT_SavedData.Attendance[name].Rank = v:sub(indexOf+1);
+					RAT:SendDebugMessage("The rank data of " .. name .. " is set to " .. RAT_SavedData.Attendance[name].Rank);
 				elseif (v:find("AP:")) then
 					RAT_SavedData.Attendance[name].Attended = v:sub(indexOf+1);
+					RAT:SendDebugMessage("The AP data of " .. name .. " is set to " .. RAT_SavedData.Attendance[name].Attended);
 				elseif (v:find("M:")) then
 					RAT_SavedData.Attendance[name].Absent = v:sub(indexOf+1);
+					RAT:SendDebugMessage("The absent data of " .. name .. " is set to " .. RAT_SavedData.Attendance[name].Absent);
 				elseif (v:find("S:")) then
 					local indexOfTwo = v:find("%/");
 					RAT_SavedData.Attendance[name].Strikes = v:sub(indexOf+1, indexOfTwo-1);
+					RAT:SendDebugMessage("The strikes data of " .. name .. " is set to " .. RAT_SavedData.Attendance[name].Strikes);
 				elseif (v:find("%%")) then
 					local indexOfTwo = v:find("%%");
 					RAT_SavedData.Attendance[name].Percent = v:sub(1, indexOfTwo-1);
+					RAT:SendDebugMessage("The percent data of " .. name .. " is set to " .. RAT_SavedData.Attendance[name].Percent);
 				end
 				RAT_SavedData.Attendance[name].Score = RAT:CalculateScore(name);
+				RAT:SendDebugMessage("The score data of " .. name .. " is set to " .. RAT_SavedData.Attendance[name].Score);
 			end
 			if (note == "") then
 				RAT:UpdateNote(name, index);
@@ -476,6 +489,7 @@ end
 	Insertionsort O(n^2)
 ]]
 function RAT:InsertionSort()
+	RAT:SendDebugMessage("Running insertion sort on all players scores...");
 	for j = 2, RAT:GetSize(RAT_SavedData.Ranks) do
 		local current = RAT_SavedData.Ranks[j];
 		local i = j - 1;
@@ -676,4 +690,4 @@ local function summaryFilter(self, event, msg)
 	return false;
 end
 
-ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", summaryFilter)
+ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", summaryFilter);

@@ -224,11 +224,11 @@ function RAT:SetNextAward(time)
 				RAT_SavedData.NextAward = time + timeDiff - sec;
 			end
 		else
-			local timeDiff = RAT:GetTimeDifferenceBetweenDays(weekday, nextRaid, hour, min, RAT_SavedOptions.RaidTimes[nextRaid].StarthHour, RAT_SavedOptions.RaidTimes[nextRaid].StartMinute);
+			local timeDiff = RAT:GetTimeDifferenceBetweenDays(weekday, nextRaid, hour, min, RAT_SavedOptions.RaidTimes[nextRaid].StartHour, RAT_SavedOptions.RaidTimes[nextRaid].StartMinute);
 			RAT_SavedData.NextAward = time + timeDiff - sec;
 		end
 	else
-		local timeDiff = RAT:GetTimeDifferenceBetweenDays(weekday, nextRaid, hour, min, RAT_SavedOptions.RaidTimes[nextRaid].StarthHour, RAT_SavedOptions.RaidTimes[nextRaid].StartMinute);
+		local timeDiff = RAT:GetTimeDifferenceBetweenDays(weekday, nextRaid, hour, min, RAT_SavedOptions.RaidTimes[nextRaid].StartHour, RAT_SavedOptions.RaidTimes[nextRaid].StartMinute);
 		RAT_SavedData.NextAward = time + timeDiff - sec;
 	end
 end
@@ -245,17 +245,19 @@ function RAT:RecoverNextAward(time)
 			if (time + freq > time + timeDiff) then -- Set to raid end
 				RAT_SavedData.NextAward = time + timeDiff - sec;
 			else
-				local minDiff = (RAT_SavedOptions.RaidTimes[nextRaid].StartMinute-min)*60;
-				RAT_SavedData.NextAward = time + freq + minDiff - sec;
+				while (freq < timeDiff) do
+					timeDiff = timeDiff - freq;
+				end
+				RAT_SavedData.NextAward = time + timeDiff - sec; --20.00+45+30=21.15 1930-20.15-21.00 19.59+45-29=19.30=20.15 19.59+60-29=20.30 20.00+60+30=21.30 20.13+60+17
 			end
 		else
-			local timeDiff = RAT:GetTimeDifferenceBetweenDays(weekday, nextRaid, hour, min, RAT_SavedOptions.RaidTimes[nextRaid].StarthHour, RAT_SavedOptions.RaidTimes[nextRaid].StartMinute);
+			local timeDiff = RAT:GetTimeDifferenceBetweenDays(weekday, nextRaid, hour, min, RAT_SavedOptions.RaidTimes[nextRaid].StartHour, RAT_SavedOptions.RaidTimes[nextRaid].StartMinute);
 			RAT_SavedData.NextAward = time + timeDiff - sec;
 			RAT_SavedData.Summary = {};
 			RAT_SavedData.Bench = {};
 		end
 	else
-		local timeDiff = RAT:GetTimeDifferenceBetweenDays(weekday, nextRaid, hour, min, RAT_SavedOptions.RaidTimes[nextRaid].StarthHour, RAT_SavedOptions.RaidTimes[nextRaid].StartMinute);
+		local timeDiff = RAT:GetTimeDifferenceBetweenDays(weekday, nextRaid, hour, min, RAT_SavedOptions.RaidTimes[nextRaid].StartHour, RAT_SavedOptions.RaidTimes[nextRaid].StartMinute);
 		RAT_SavedData.NextAward = time + timeDiff - sec;
 		RAT_SavedData.Summary = {};
 		RAT_SavedData.Bench = {};
@@ -275,6 +277,7 @@ function RAT:IsItRaidFinish()
 	local timeZone = RAT_SavedData.TimeZone or RAT:GetRealmTimeZone();
 	local weekday, day, month, year, hour, min, sec = getRealmTime(timeZone);
 	if (select(2,RAT:GetTimeDifferenceBetweenDays(weekday, weekday, RAT_SavedOptions.RaidTimes[weekday].FinishHour, RAT_SavedOptions.RaidTimes[weekday].FinishMinute, hour, min)) == 7) then
+		RAT:SendDebugMessage("The raid has ended has there is 7 days between " .. weekday .. RAT_SavedOptions.RaidTimes[weekday].FinishHour .. RAT_SavedOptions.RaidTimes[weekday].FinishMinute .. " and " .. weekday .. hour .. min);
 		return true;
 	end
 	return false;
@@ -330,7 +333,7 @@ function RAT:GetTimeDifferenceBetweenDays(prevRaid, nextRaid, prevFinishHour, pr
 	elseif (prevFinishMinute < nextStartMinute) then
 		minuteDiff = nextStartMinute - prevFinishMinute;
 	else
-		minuteDiff = 0	
+		minuteDiff = 0
 	end
 
 	return timeUnitsToSeconds(dayDiff,hourDiff,minuteDiff), dayDiff, hourDiff, minuteDiff;

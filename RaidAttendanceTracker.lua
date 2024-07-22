@@ -29,6 +29,8 @@ local weekdays = {[1] = "Sunday", [2] = "Monday", [3] = "Tuesday", [4] = "Wednes
 local escapeCodes = {};
 escapeCodes.SUCCESS = "|cFF00FF00";
 escapeCodes.FAIL = "|cFFFF0000";
+escapeCodes.DEBUG = "|cFF43ABC9";
+escapeCodes.WARNING = "|cFFFFFF00";
 
 
 ---------------------
@@ -48,7 +50,7 @@ SLASH_RAIDATTENDANCETRACKER1 = "/rat"; -- slashcommand
 --	LEADERRBOARD    --
 ----------------------
 
-local leaderBoard = CreateFrame("Frame");
+local leaderBoard = CreateFrame("Frame", nil, nil, BackdropTemplateMixin and "BackdropTemplate");
 leaderBoard:SetWidth(180);
 leaderBoard:SetHeight(450);
 leaderBoard:SetPoint("CENTER");
@@ -58,6 +60,12 @@ leaderBoard:RegisterForDrag("LeftButton");
 leaderBoard:SetFrameLevel(3);
 leaderBoard:SetScript("OnDragStart", leaderBoard.StartMoving);
 leaderBoard:SetScript("OnDragStop", leaderBoard.StopMovingOrSizing);
+leaderBoard:SetBackdrop({bgFile = "Interface/Tooltips/UI-Tooltip-Background", --Set the background and border textures
+	edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+	tile = true, tileSize = 16, edgeSize = 16,
+	insets = { left = 4, right = 4, top = 4, bottom = 4 }
+});
+leaderBoard:SetBackdropColor(0.3,0.3,0.3,0.6);
 leaderBoard:Hide();
 
 local texture = leaderBoard:CreateTexture();
@@ -98,6 +106,13 @@ function RAT:InitRaidTimes()
 	RAT_SavedOptions.RaidTimes.Friday = {};
 	RAT_SavedOptions.RaidTimes.Saturday = {};
 	RAT_SavedOptions.RaidTimes.Sunday = {};
+end
+
+function RAT:SendDebugMessage(msg)
+	if (RAT_SavedOptions.Debug) then
+		RAT_SavedData.DebugLog[#RAT_SavedData.DebugLog+1] = tostring(date("%y/%m/%d %H:%M:%S")) .." : " .. msg;
+		DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.DEBUG .. L.ADDON .. msg);
+	end
 end
 
 --[[
@@ -292,6 +307,14 @@ local function handler(msg, editbox)
 			elseif (cmd == "sync") then
 				RAT:Sync();
 				DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.SUCCESS .. L.ADDON .. L.SYSTEM_STARTED_SYNC);
+			elseif (cmd == "debug") then
+				if (RAT_SavedOptions.Debug == false) then
+					RAT_SavedOptions.Debug = true;
+					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.SUCCESS .. L.ADDON .. L.SYSTEM_DEBUG_ENABLED);
+				else
+					RAT_SavedOptions.Debug = false;
+					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.SUCCESS .. L.ADDON .. L.SYSTEM_DEBUG_DISABLED);
+				end
 			end
 		elseif (not C_GuildInfo.CanEditOfficerNote()) then
 			DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ERROR_NOT_OFFICER);
@@ -322,6 +345,7 @@ f:SetScript("OnUpdate", function(self, elapsed)
 		syncDelay = syncDelay - elapsed;
 	end
 	if (syncDelay <= 0 and not synced and C_GuildInfo.CanEditOfficerNote()) then
+		RAT:SendDebugMessage("Sync delay has passed. Requesting Guild Roster..., Starting Sync");
 		synced = true;
 		C_GuildInfo.GuildRoster();
 		RAT:Sync();
@@ -331,7 +355,8 @@ f:SetScript("OnUpdate", function(self, elapsed)
 	local time = GetServerTime();
 	if (time > RAT_SavedData.NextAward and RAT_SavedData.NextAward ~= 0 and C_GuildInfo.CanEditOfficerNote()) then
 		local freq = RAT_SavedOptions.Frequency * 60;
-		if (time > RAT_SavedData.NextAward + 60) then --Player is considered late
+		if (time > RAT_SavedData.NextAward + 60) then --User is considered late
+			RAT:SendDebugMessage("The time for NextAward: " .. RAT_SavedData.NextAward .. " has passed as time is: " .. time .. " but the player is considered late causing no rewards to be given out and calculating when the next reward should be... Also requesting the bench from other addon users.");
 			RAT:RecoverNextAward(time);
 			RAT:BroadcastNextAward(RAT:FromSecondsToBestUnit(RAT_SavedData.NextAward-time));
 			RAT_SavedData.Summary = {};
@@ -341,15 +366,17 @@ f:SetScript("OnUpdate", function(self, elapsed)
 				RAT_SavedData.Bench = {};
 				RAT_SavedData.Summary = {};
 				if (not RAT_SavedOptions.AwardStart) then
+					RAT:SendDebugMessage("The time for NextAward: " .. RAT_SavedData.NextAward .. " has passed as time is: " .. time .. " but rewards on raid start is turned off.");
 					RAT:SetNextAward(time);
 					--Dont award raid start
 					return;
 				end
 			end
+			RAT:SendDebugMessage("The time for NextAward: " .. RAT_SavedData.NextAward .. " has passed as time is: " .. time .. " and rewards will be given out.");
 			RAT:SetNextAward(time);
 			--RAT:CleanAltDb();
 			--C_ChatInfo.SendAddonMessage("RATSYSTEM", "GETALTS", "GUILD");
-			if (IsInRaid()) then 
+			if (IsInRaid()) then
 				C_ChatInfo.SendAddonMessage("RATSYSTEM", "GETRANK", "RAID");
 				C_Timer.After(10, function()
 					if (RAT:GetHighestRankingUser() == UnitName("player") and synced) then
@@ -360,9 +387,17 @@ f:SetScript("OnUpdate", function(self, elapsed)
 						RAT:BroadcastNextAward(RAT:FromSecondsToBestUnit(RAT_SavedData.NextAward-time));
 						C_ChatInfo.SendAddonMessage("RATSYSTEM", "SYNCATTENDANCE", "GUILD");
 						if (RAT:IsItRaidFinish()) then
-							RAT:BroadcastSummary();
-							RAT_SavedData.Bench = {};
-							RAT_SavedData.Summary = {};
+							RAT:SendDebugMessage("Raid ended. Sending summary and reseting variables...");
+							C_Timer.NewTicker(1, function(s)
+								if (not RAT:IsAwardHandOutRunning()) then
+									RAT:BroadcastSummary();
+									RAT_SavedData.Bench = {};
+									RAT_SavedData.Summary = {};
+									RAT:SendDebugMessage("Variables have been reset");
+									s:Cancel();
+									s = nil;
+								end
+							end);
 						end
 					elseif (not synced) then
 						DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.SYSTEM_STILL_SYNCING1 .. L.SYSTEM_STILL_SYNCING2 .. math.floor(syncDelay+0.5) .. L.SYSTEM_STILL_SYNCING3);
@@ -395,6 +430,7 @@ f:SetScript("OnEvent", function(self, event, ...)
 			if (RAT_SavedData.Bench == nil) then RAT_SavedData.Bench = {}; end
 			if (RAT_SavedData.Summary == nil) then RAT_SavedData.Summary = {}; end
 			if (RAT_SavedData.SetupCompleted == nil) then RAT_SavedData.SetupCompleted = false; end
+			if (RAT_SavedData.DebugLog == nil) then RAT_SavedData.DebugLog = {}; end
 
 			if (RAT_SavedOptions.RaidTimes == nil) then RAT:InitRaidTimes(); end
 			if (RAT_SavedOptions.AwardStart == nil) then RAT_SavedOptions.AwardStart = true; end
@@ -405,6 +441,7 @@ f:SetScript("OnEvent", function(self, event, ...)
 			if (RAT_SavedOptions.MinimapDegree == nil) then RAT_SavedOptions.MinimapDegree = 30; end
 			if (RAT_SavedOptions.MinimapDegree) then RAT:SetMinimapPoint(RAT_SavedOptions.MinimapDegree); end
 			if (RAT_SavedOptions.MinimapMode == nil) then RAT_SavedOptions.MinimapMode = "Always"; end
+			if (RAT_SavedOptions.Debug == nil) then RAT_SavedOptions.Debug = false; end
 		end
 	elseif (event == "CHAT_MSG_RAID" or event == "CHAT_MSG_RAID_LEADER") then
 		local message, sender = ...;
@@ -692,10 +729,10 @@ ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", helpFilterSend)
 ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", altFilterSend)
 ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", benchFilterSend)
 
-local options = CreateFrame("Frame", nil, InterefaceOptionsFramePanelContainer);
+local options = CreateFrame("Frame", nil, InterfaceOptionsFramePanelContainer);
 options.name = "Raid Attendance Tracker";
 options:Hide();
-options:SetScript("OnShow", function(PGF_options)
+options:SetScript("OnShow", function(self)
 	InterfaceOptionsFrame_OpenToCategory(RAT_RT_Options);
 end);
 
@@ -704,37 +741,37 @@ InterfaceOptions_AddCategory(options);
 --------------------------
 ------Blizzard Taint------
 --------------------------
-if ((UIDROPDOWNMENU_OPEN_PATCH_VERSION or 0) < 1) then 
+if ((UIDROPDOWNMENU_OPEN_PATCH_VERSION or 0) < 1) then
 	UIDROPDOWNMENU_OPEN_PATCH_VERSION = 1;
-	hooksecurefunc("UIDropDownMenu_InitializeHelper", function(frame) 
-		if (UIDROPDOWNMENU_OPEN_PATCH_VERSION ~= 1) then 
-			return; 
-		end 
-		if (UIDROPDOWNMENU_OPEN_MENU and UIDROPDOWNMENU_OPEN_MENU ~= frame and not issecurevariable(UIDROPDOWNMENU_OPEN_MENU, "displayMode")) then 
+	hooksecurefunc("UIDropDownMenu_InitializeHelper", function(frame)
+		if (UIDROPDOWNMENU_OPEN_PATCH_VERSION ~= 1) then
+			return;
+		end
+		if (UIDROPDOWNMENU_OPEN_MENU and UIDROPDOWNMENU_OPEN_MENU ~= frame and not issecurevariable(UIDROPDOWNMENU_OPEN_MENU, "displayMode")) then
 			UIDROPDOWNMENU_OPEN_MENU = nil;
 			local t, f, prefix, i = _G, issecurevariable, " \0", 1;
-			repeat 
+			repeat
 				i, t[prefix .. i] = i + 1;
 			until f("UIDROPDOWNMENU_OPEN_MENU")
-		end 
-	end) 
+		end
+	end)
 end
-if ((UIDROPDOWNMENU_VALUE_PATCH_VERSION or 0) < 2) then 
+if ((UIDROPDOWNMENU_VALUE_PATCH_VERSION or 0) < 2) then
 	UIDROPDOWNMENU_VALUE_PATCH_VERSION = 2;
-	hooksecurefunc("UIDropDownMenu_InitializeHelper", function() 
-		if (UIDROPDOWNMENU_VALUE_PATCH_VERSION ~= 2) then 
+	hooksecurefunc("UIDropDownMenu_InitializeHelper", function()
+		if (UIDROPDOWNMENU_VALUE_PATCH_VERSION ~= 2) then
 			return;
-		end 
-		for i=1, UIDROPDOWNMENU_MAXLEVELS do 
-			for j=1, UIDROPDOWNMENU_MAXBUTTONS do 
+		end
+		for i=1, UIDROPDOWNMENU_MAXLEVELS do
+			for j=1, UIDROPDOWNMENU_MAXBUTTONS do
 				local b = _G["DropDownList" .. i .. "Button" .. j];
-				if (not (issecurevariable(b, "value") or b:IsShown())) then 
+				if (not (issecurevariable(b, "value") or b:IsShown())) then
 					b.value = nil;
-					repeat 
+					repeat
 						j, b["fx" .. j] = j+1;
-					until issecurevariable(b, "value") 
-				end 
-			end 
-		end 
-	end) 
+					until issecurevariable(b, "value")
+				end
+			end
+		end
+	end)
 end

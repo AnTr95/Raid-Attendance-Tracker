@@ -5,8 +5,8 @@ local addon = ...
 L.ADDON = "RAT: ";
 L.DOT = ".";
 L.ADDON_FULL = "Raid Attendance Tracker (RAT)";
-L.ADDON_VERSION = "Version: " .. GetAddOnMetadata(addon, "Version");
-L.ADDON_AUTHOR = "Author: " .. GetAddOnMetadata(addon, "Author");
+L.ADDON_VERSION = "Version: " .. C_AddOns.GetAddOnMetadata(addon, "Version");
+L.ADDON_AUTHOR = "Author: " .. C_AddOns.GetAddOnMetadata(addon, "Author");
 L.HELP1 = "All commands must be sent through whispers and not battle.net whispers. The public note shows each players R:(Rank) AP:(Attendace Points) M:(Missed AP) (Percent of possible AP gained)% and S:(Strikes)/3";
 L.HELP2 = "There are 2 commands you can send to a RAT Officer: !rat bench - Puts you on the bench so you can leave the raid. !rat alt Main(Player) - Binds your current character to your main";
 
@@ -17,6 +17,8 @@ L.SYSTEM_UPDATE_COMPLETED = "Updated all players.";
 L.SYSTEM_ALT_ADDED = " is now an alt of ";
 L.SYSTEM_STARTED_SYNC = "Started data sync.";
 L.SYSTEM_DELETED_DATA = " has purged all attendance related data.";
+L.SYSTEM_DEBUG_ENABLED = "Debug mode has been enabled.";
+L.SYSTEM_DEBUG_DISABLED = "Debug mode has been disabled.";
 
 L.ERROR_BENCHED_ALREADY =" is already on the bench.";
 L.ERROR_PLAYER_INELIGIBLE = " is not of an allowed rank nor an alt.";

@@ -1,0 +1,30 @@
+{
+    "Lua.diagnostics.globals": [
+        "UIDropDownMenu_SetWidth",
+        "UIDropDownMenu_SetButtonWidth",
+        "UIDropDownMenu_JustifyText",
+        "UIDropDownMenu_Initialize",
+        "StaticPopupDialogs",
+        "InterfaceOptions_AddCategory",
+        "UIDropDownMenu_SetSelectedID",
+        "StaticPopup_Show",
+        "UIDropDownMenu_AddButton",
+        "UIDropDownMenu_SetSelectedName",
+        "UIDropDownMenu_CreateInfo",
+        "DEFAULT_CHAT_FRAME",
+        "SlashCmdList",
+        "ChatFrame_AddMessageEventFilter",
+        "InterfaceOptionsFrame_OpenToCategory",
+        "UIDROPDOWNMENU_MAXLEVELS",
+        "UIDROPDOWNMENU_MAXBUTTONS",
+        "MouseIsOver",
+        "DEFAULT",
+        "CompactRaidFrameContainer",
+        "ObjectiveTrackerFrame",
+        "EJSuggestFrame_OpenFrame",
+        "EJ_ContentTab_SetEnabled",
+        "EncounterJournal",
+        "ChatTypeInfo",
+        "BattlefieldMapFrame"
+    ]
+}

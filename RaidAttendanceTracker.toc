@@ -1,6 +1,6 @@
-## Interface: 100007
+## Interface: 100206
 ## Title: Raid Attendance Tracker
-## Version: 2.9r
+## Version: 3.0r
 ## Author: Ant-Kazzak
 ## Notes: Tracks the attendance of your raiders
 ## SavedVariables: RAT_SavedData
