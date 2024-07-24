@@ -120,9 +120,8 @@ end
 	param(msg) string
 ]]
 local function handler(msg, editbox)
-	msg = string.lower(msg);
 	local arg = RAT:GetArg(msg);
-	local cmd = RAT:GetCmd(msg);
+	local cmd = RAT:GetCmd(string.lower(msg));
 	if (cmd ~= "") then
 		if (synced and C_GuildInfo.CanEditOfficerNote()) then
 			if (cmd == "award") then
@@ -251,6 +250,7 @@ local function handler(msg, editbox)
 					arg = arg:gsub("^%l", string.upper);
 					if (RAT:GetMain(arg)) then
 						arg = RAT:GetMain(arg);
+						arg = Ambiguate(arg, "none");
 					end
 					local index = RAT:GetGuildMemberIndex(arg);
 					if (index ~= -1 and RAT:Eligible(index)) then
@@ -275,6 +275,7 @@ local function handler(msg, editbox)
 					local altIndex = RAT:GetGuildMemberIndex(args[2]);
 					local altNote = select(8, GetGuildRosterInfo(altIndex));
 					local mainNote = select(8, GetGuildRosterInfo(mainIndex));
+					local mainName = select(1, GetGuildRosterInfo(mainIndex));
 					if (args[1] ~= args[2]) then
 						--if (not RAT:ContainsKey(RAT_SavedData.AltDb, args[1]) and mainIndex ~= -1 and RAT:Eligible(mainIndex) and altIndex ~= -1) then
 						--	RAT:InitAlt(args[1]);
@@ -285,8 +286,8 @@ local function handler(msg, editbox)
 						--	DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.SUCCESS .. L.ADDON .. args[2] .. L.SYSTEM_ALT_ADDED .. args[1] .. L.DOT);
 						--	C_ChatInfo.SendAddonMessage("RATSYSTEM", "SYNCATTENDANCE", "GUILD");
 						if (altNote ~= args[1] and mainIndex ~= -1 and RAT:Eligible(mainIndex) and altIndex ~= -1) then
-							GuildRosterSetOfficerNote(altIndex, args[1]);
-							GuildRosterSetPublicNote(altIndex, mainNote)
+							GuildRosterSetOfficerNote(altIndex, mainName);
+							GuildRosterSetPublicNote(altIndex, mainNote);
 							DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.SUCCESS .. L.ADDON .. args[2] .. L.SYSTEM_ALT_ADDED .. args[1] .. L.DOT);
 						elseif (altNote == args[1]) then
 							DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. args[1] .. L.ERROR_ALT_ALREADY .. args[2] .. L.DOT);
@@ -379,7 +380,7 @@ f:SetScript("OnUpdate", function(self, elapsed)
 			if (IsInRaid()) then
 				C_ChatInfo.SendAddonMessage("RATSYSTEM", "GETRANK", "RAID");
 				C_Timer.After(10, function()
-					if (RAT:GetHighestRankingUser() == UnitName("player") and synced) then
+					if (RAT:GetHighestRankingUser() == GetUnitName("player", true) and synced) then
 						RAT:AllAttended(1);
 						if (RAT_SavedOptions.PunishCalendar and RAT:IsItRaidStart()) then
 							RAT:PunishCalendar();
@@ -444,7 +445,7 @@ f:SetScript("OnEvent", function(self, event, ...)
 		local message, sender = ...;
 		message = string.lower(message);
 		if (message == "!rat" and synced) then
-			sender = Ambiguate(sender, "short");
+			sender = Ambiguate(sender, "none");
 			ticks = 6;
 			playersRegister = true;
 			playersToRank[currentIndex] = sender;
@@ -452,8 +453,9 @@ f:SetScript("OnEvent", function(self, event, ...)
 		end
 	elseif (event == "CHAT_MSG_WHISPER") then
 		local message, sender = ...;
+		local fullNameSender = sender;
 		message = string.lower(message);
-		sender = Ambiguate(sender, "short");
+		sender = Ambiguate(sender, "none");
 		local arg = RAT:GetArg(message);
 		local cmd = RAT:GetCmd(message);
 		if (cmd == "!rat") then
@@ -469,7 +471,7 @@ f:SetScript("OnEvent", function(self, event, ...)
 					if (RAT:Eligible(index) and not RAT:IsBenched(sender)) then
 						RAT_SavedData.Bench[RAT:GetSize(RAT_SavedData.Bench)+1] = sender;
 						SendChatMessage(L.ADDON .. sender .. L.BROADCAST_BENCHED_PLAYER, "GUILD");
-						C_ChatInfo.SendAddonMessage("RATSYSTEM", "BENCH " .. sender, "GUILD");
+						C_ChatInfo.SendAddonMessage("RATSYSTEM", "BENCH " .. fullNameSender, "GUILD");
 					elseif (RAT:IsBenched(sender)) then
 						SendChatMessage(L.ADDON .. sender .. L.ERROR_BENCHED_ALREADY, "WHISPER", nil, sender);
 					end
@@ -510,20 +512,21 @@ f:SetScript("OnEvent", function(self, event, ...)
 		end
 	elseif (event == "CHAT_MSG_ADDON") then
 		local prefix, msg, channel, sender = ...;
-		sender = Ambiguate(sender, "short");
-		if (prefix == "RATSYSTEM" and Ambiguate(UnitName("player"), "short") ~= sender) then
+		sender = Ambiguate(sender, "none");
+		if (prefix == "RATSYSTEM" and GetUnitName("player") ~= sender) then
 			msg = RAT:Split(msg);
 			local internalPrefix = msg[1];
 			if (internalPrefix and internalPrefix == "BENCH") then
 				if (C_GuildInfo.CanEditOfficerNote()) then
-					local raider = msg[2];
+					local raider = Ambiguate(msg[2], "none");
 					if (raider and not RAT:IsBenched(raider)) then
 						RAT_SavedData.Bench[RAT:GetSize(RAT_SavedData.Bench)+1] = raider;
 					end
 				end
 			elseif (internalPrefix and internalPrefix == "GETRANK" and synced) then
 				if (C_GuildInfo.CanEditOfficerNote()) then
-					local sendMsg = "RETURNRANK " .. UnitName("player") .. " " .. select(3, GetGuildInfo("player"));
+					local name, server = UnitFullName("player");
+					local sendMsg = "RETURNRANK " .. name .. "-" .. server .. " " .. select(3, GetGuildInfo("player"));
 					C_ChatInfo.SendAddonMessage("RATSYSTEM", sendMsg, "WHISPER", sender);
 				end
 			elseif (internalPrefix and internalPrefix == "RETURNRANK") then

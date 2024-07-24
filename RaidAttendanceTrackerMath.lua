@@ -30,7 +30,7 @@ end
 function RAT:InitRaid()
 	if (IsInRaid()) then
 		for i = 1, GetNumGroupMembers() do
-			local pl = GetUnitName("raid".. i);
+			local pl = Ambiguate(GetUnitName("raid".. i, true), "none");
 			if (not RAT:ContainsKey(RAT_SavedData.Attendance, pl)) then
 				RAT:InitPlayer(pl);
 			end
@@ -156,7 +156,7 @@ function RAT:GetAbsentPlayers(absent)
 		for k, v in pairs(RAT_SavedData.Attendance) do
 			attending = false;
 			for i = 1, GetNumGroupMembers() do
-				local pl = GetUnitName("raid" .. i);
+				local pl = Ambiguate(GetUnitName("raid" .. i, true), "none");
 				if (RAT:GetMain(pl)) then
 					local main = RAT:GetMain(pl);
 					if (main) then
@@ -182,7 +182,7 @@ function RAT:GetAbsentPlayers(absent)
 					if (not isAwardHandOutRunning) then
 						isAwardHandOutRunning = true;
 					end
-					C_Timer.After(count*0.06, function()
+				C_Timer.After(count*0.1, function()
 						RAT:SendDebugMessage(k .. " is absent and will recieve " .. absent .. " missed points");
 						RAT:PlayerAbsent(k, absent);
 						if (next(RAT_SavedData.Attendance, k) == nil) then
@@ -208,7 +208,7 @@ function RAT:AllAttended(attended)
 		--What if main is in the raid
 		--local bench = RAT:GetBench()
 		for i = 1, GetNumGroupMembers() do
-			local pl = GetUnitName("raid" .. i);
+			local pl = Ambiguate(GetUnitName("raid" .. i, true), "none");
 			local index = RAT:GetGuildMemberIndex(pl);
 			local isBench = RAT:IsBenched(pl);
 			if (RAT:GetMain(pl)) then
@@ -227,7 +227,7 @@ function RAT:AllAttended(attended)
 					if (not isAwardHandOutRunning) then
 						isAwardHandOutRunning = true;
 					end
-					C_Timer.After(count*0.06, function()
+					C_Timer.After(count*0.1, function()
 						RAT:PlayerAttended(pl, attended);
 						attendingPlayers[#attendingPlayers+1] = pl;
 						if (i == GetNumGroupMembers()) then
@@ -248,7 +248,7 @@ function RAT:AllAttended(attended)
 				if (not isAwardHandOutRunning) then
 					isAwardHandOutRunning = true;
 				end
-				C_Timer.After(count*0.06, function()
+				C_Timer.After(count*0.1, function()
 					RAT:PlayerAttended(pl, attended);
 					attendingPlayers[#attendingPlayers+1] = pl;
 					if (i == RAT:GetSize(RAT_SavedData.Bench)) then
@@ -257,7 +257,7 @@ function RAT:AllAttended(attended)
 				end);
 			end
 		end
-		C_Timer.After(2, function()
+		C_Timer.After(3.5, function()
 			isAwardHandOutRunning = false;
 			RAT:Broadcast(attended);
 			RAT:GetAbsentPlayers(attended);
@@ -265,7 +265,7 @@ function RAT:AllAttended(attended)
 			RAT:SetLastAttending(attendingPlayers);
 			RAT:SetLastAmount(attended);
 		end);
-		C_Timer.After(3, function() RAT:UpdateAllAlts(); end);
+		C_Timer.After(4, function() RAT:UpdateAllAlts(); end);
 	end
 end
 function RAT:PlayerAttended(playerName, attended)
@@ -317,7 +317,7 @@ function RAT:Undo(lastAttending, lastAbsent, lastAmount)
 	RAT:UpdateRank();
 	SendChatMessage(L.ADDON .. L.BROADCAST_UNDONE_AWARD, "GUILD");
 	RAT:SetLastAmount(-lastAmount);
-	C_Timer.After(2.5, function() RAT:UpdateAllAlts(); end);
+	C_Timer.After(4, function() RAT:UpdateAllAlts(); end);
 end
 
 function RAT:IsAwardHandOutRunning()

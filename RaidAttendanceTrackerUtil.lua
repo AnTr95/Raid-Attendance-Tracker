@@ -20,13 +20,14 @@ local function compareAlphabetically(str1, str2)
 	return strLetter1 < strLetter2;
 end
 
+--Remove servers from broadcast
 function RAT:Broadcast(amount)
 	local awardedPlayers = {};
 	local playersToText;
 	if (IsInRaid()) then
 		local bench = RAT:GetBench();
 		for i = 1, GetNumGroupMembers() do
-			local pl = UnitName("raid" .. i);
+			local pl = Ambiguate(GetUnitName("raid" .. i, true), "none");
 			local index = RAT:GetGuildMemberIndex(pl);
 			if (RAT:GetMain(pl)) then
 				local main = RAT:GetMain(pl);
@@ -54,19 +55,20 @@ function RAT:Broadcast(amount)
 	local strings = RAT:ToString(awardedPlayers);
 	SendChatMessage(L.ADDON .. L.BROADCAST_AWARDED_ALL1 .. amount .. L.BROADCAST_AWARDED_ALL2 .. strings[1], "GUILD", "COMMON", nil);
 	for i = 2, #strings do
-		C_Timer.After(i*0.1, function() 
+		C_Timer.After(i*0.5, function()
 			SendChatMessage(strings[i], "GUILD", "COMMON", nil);
 		end);
 	end
 end
 
+--Remove servers from broadcast
 function RAT:BroadcastAbsent(players)
 	local strings = RAT:ToString(players);
-	C_Timer.After(0.4, function() 
+	C_Timer.After(1.5, function()
 		SendChatMessage(L.ADDON .. L.BROADCAST_ABSENT_ALL .. strings[1], "GUILD", "COMMON", nil);
 	end);
 	for i = 2, #strings do
-		C_Timer.After(0.4+(i*0.1), function() 
+		C_Timer.After(1.5+(i*0.5), function()
 			SendChatMessage(strings[i], "GUILD", "COMMON", nil);
 		end);
 	end
@@ -77,7 +79,7 @@ function RAT:BroadcastStrike(player)
 end
 ]]
 function RAT:BroadcastNextAward(time)
-	C_Timer.After(0.8, function() 
+	C_Timer.After(4, function()
 		SendChatMessage(L.ADDON .. L.BROADCAST_AWARD_NEXT .. time, "GUILD", "COMMON", nil);
 	end);
 end
@@ -251,13 +253,11 @@ end
 	Returns the guild members index based of a name, if no name is found return -1
 ]]
 function RAT:GetGuildMemberIndex(name)
+	name = Ambiguate(name, "none");
 	for i = 1, GetNumGuildMembers() do
-		local fullName = GetGuildRosterInfo(i);
-		if (fullName) then
-			fullName = fullName:sub(0, fullName:find("-")-1);
-			if (name == fullName) then
-				return i;
-			end
+		local fullName = Ambiguate(GetGuildRosterInfo(i), "none");
+		if (name == fullName) then
+			return i;
 		end
 	end
 	return -1;
@@ -396,7 +396,7 @@ function RAT:Sync()
 	RAT_SavedData.Ranks = {};
 	RAT:SendDebugMessage("Syncing database with current notes. Iterating on all guild members...");
 	for i = 1, GetNumGuildMembers() do
-		local name = Ambiguate(select(1, GetGuildRosterInfo(i)), "short");
+		local name = Ambiguate(select(1, GetGuildRosterInfo(i)), "none");
 		if (RAT:Eligible(i) and not RAT:GetMain(name)) then
 			local note = select(8, GetGuildRosterInfo(i));
 			if (note) then
@@ -470,7 +470,7 @@ end
 function RAT:GetHighestRankingUser()
 	local userRank = select(3,GetGuildInfo("player"));
 	local highestRank = userRank;
-	local highestUser = UnitName("player");
+	local highestUser = Ambiguate(GetUnitName("player", true), "none");
 	for user, rank in pairs(RAT.Users) do
 		if (rank < highestRank) then
 			highestRank = rank;
@@ -564,7 +564,7 @@ end]]
 
 function RAT:UpdateAllAlts()
 	for index = 1, GetNumGuildMembers() do
-		local name = Ambiguate(select(1, GetGuildRosterInfo(index)), "short");
+		local name = Ambiguate(select(1, GetGuildRosterInfo(index)), "none");
 		local main = RAT:GetMain(name);
 		if (main) then
 			local mainIndex = RAT:GetGuildMemberIndex(main);
@@ -577,7 +577,7 @@ end
 
 function RAT:UpdatePlayerAlts(main)
 	for index = 1, GetNumGuildMembers() do
-		local name = Ambiguate(select(1, GetGuildRosterInfo(index)), "short");
+		local name = GetGuildRosterInfo(index);
 		local itMain = RAT:GetMain(name);
 		if (itMain == main) then
 			local mainIndex = RAT:GetGuildMemberIndex(main);

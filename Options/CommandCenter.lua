@@ -350,7 +350,7 @@ StaticPopupDialogs["RAT_DELETE_BUTTON"] = {
 	OnAccept = function(self, data, data2)
 		for i = 1, GetNumGuildMembers() do
 			local isEligible = RAT:Eligible(i);
-			local name = Ambiguate(GetGuildRosterInfo(i), "short");
+			local name = Ambiguate(GetGuildRosterInfo(i), "none");
 			local hasMain = RAT:GetMain(name);
 			RAT_SavedData.Attendance = {};
 			if (isEligible or hasMain) then
@@ -369,7 +369,7 @@ StaticPopupDialogs["RAT_DELETE_BUTTON"] = {
 			end
 		end
 		RAT:Sync();
-		SendChatMessage(L.ADDON .. Ambiguate(UnitName("player"), "short") .. L.SYSTEM_DELETED_DATA, "GUILD");
+		SendChatMessage(L.ADDON .. Ambiguate(UnitName("player"), "none") .. L.SYSTEM_DELETED_DATA, "GUILD");
 	end,
 	EditBoxOnTextChanged = function(self, data)
 		local input = self:GetText();
