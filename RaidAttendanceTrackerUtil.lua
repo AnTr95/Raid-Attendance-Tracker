@@ -7,6 +7,7 @@ escapeCodes.SUCCESS = "|cFF00FF00";
 escapeCodes.FAIL = "|cFFFF0000";
 local PAU = {}; --Players Awaiting Update
 local calendarRaidIndex = nil;
+local guildMemberIndexes = {};
 local noteQueue = {};
 
 local GetGuildRosterInfo = GetGuildRosterInfo;
@@ -263,6 +264,21 @@ function RAT:GetGuildMemberIndex(name)
 	return -1;
 end
 
+function RAT:InitGuildMemberIndexes()
+	for i = 1, GetNumGuildMembers() do
+		local fullName = Ambiguate(GetGuildRosterInfo(i), "none");
+		guildMemberIndexes[fullName] = i;
+	end
+	return guildMemberIndexes;
+end
+
+function RAT:GetGuildMemberIndexLookup(name)
+	if (guildMemberIndexes[name]) then
+		return guildMemberIndexes[name];
+	end
+	return -1;
+end
+
 function RAT:UpdateNote(name, index)
 	if (not RAT:Contains(PAU, name)) then
 		table.insert(PAU, name);
@@ -394,6 +410,7 @@ function RAT:Sync()
 	--Points of improvement: index is redundant and equal to i? Secondly thescore is being updated constantly instead of after the entire loop is done
 	RAT_SavedData.Attendance = {};
 	RAT_SavedData.Ranks = {};
+	RAT:InitGuildMemberIndexes();
 	RAT:SendDebugMessage("Syncing database with current notes. Iterating on all guild members...");
 	for i = 1, GetNumGuildMembers() do
 		local name = Ambiguate(select(1, GetGuildRosterInfo(i)), "none");

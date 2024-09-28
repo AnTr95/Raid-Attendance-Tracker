@@ -141,7 +141,7 @@ function RAT:Import(playerName, attended, absent)
 			RAT_SavedData.Attendance[playerName].Percent = RAT:CalculatePercent(playerName);
 			RAT_SavedData.Attendance[playerName].Score = RAT:CalculateScore(playerName);
 			RAT:UpdateRank();
-		end	
+		end
 	end
 end
 
@@ -182,7 +182,7 @@ function RAT:GetAbsentPlayers(absent)
 					if (not isAwardHandOutRunning) then
 						isAwardHandOutRunning = true;
 					end
-				C_Timer.After(count*0.1, function()
+				C_Timer.After(count*0.06, function()
 						RAT:SendDebugMessage(k .. " is absent and will recieve " .. absent .. " missed points");
 						RAT:PlayerAbsent(k, absent);
 						if (next(RAT_SavedData.Attendance, k) == nil) then
@@ -227,7 +227,7 @@ function RAT:AllAttended(attended)
 					if (not isAwardHandOutRunning) then
 						isAwardHandOutRunning = true;
 					end
-					C_Timer.After(count*0.1, function()
+					C_Timer.After(count*0.06, function()
 						RAT:PlayerAttended(pl, attended);
 						attendingPlayers[#attendingPlayers+1] = pl;
 						if (i == GetNumGroupMembers()) then
@@ -248,7 +248,7 @@ function RAT:AllAttended(attended)
 				if (not isAwardHandOutRunning) then
 					isAwardHandOutRunning = true;
 				end
-				C_Timer.After(count*0.1, function()
+				C_Timer.After(count*0.06, function()
 					RAT:PlayerAttended(pl, attended);
 					attendingPlayers[#attendingPlayers+1] = pl;
 					if (i == RAT:GetSize(RAT_SavedData.Bench)) then
@@ -257,7 +257,7 @@ function RAT:AllAttended(attended)
 				end);
 			end
 		end
-		C_Timer.After(3.5, function()
+		C_Timer.After(2, function()
 			isAwardHandOutRunning = false;
 			RAT:Broadcast(attended);
 			RAT:GetAbsentPlayers(attended);
@@ -265,7 +265,7 @@ function RAT:AllAttended(attended)
 			RAT:SetLastAttending(attendingPlayers);
 			RAT:SetLastAmount(attended);
 		end);
-		C_Timer.After(4, function() RAT:UpdateAllAlts(); end);
+		C_Timer.After(3, function() RAT:UpdateAllAlts(); end);
 	end
 end
 function RAT:PlayerAttended(playerName, attended)
@@ -317,7 +317,7 @@ function RAT:Undo(lastAttending, lastAbsent, lastAmount)
 	RAT:UpdateRank();
 	SendChatMessage(L.ADDON .. L.BROADCAST_UNDONE_AWARD, "GUILD");
 	RAT:SetLastAmount(-lastAmount);
-	C_Timer.After(4, function() RAT:UpdateAllAlts(); end);
+	C_Timer.After(2.5, function() RAT:UpdateAllAlts(); end);
 end
 
 function RAT:IsAwardHandOutRunning()
