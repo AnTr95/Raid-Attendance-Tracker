@@ -1,7 +1,8 @@
-## Interface: 110005
+## Interface: 110100
 ## Title: Raid Attendance Tracker
-## Version: 3.3r
+## Version: 3.45
 ## Author: Ant-Kazzak
+## Category: Dungeons & Raids
 ## Notes: Tracks the attendance of your raiders
 ## AddonCompartmentFunc: RAT_OnAddonCompartmentClick
 ## IconTexture: Interface\AddOns\RaidAttendanceTracker\Res\minimap3
