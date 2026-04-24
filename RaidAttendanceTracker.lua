@@ -69,7 +69,7 @@ leaderBoard:SetBackdropColor(0.3,0.3,0.3,0.6);
 leaderBoard:Hide();
 
 local texture = leaderBoard:CreateTexture();
-texture:SetTexture(0.5, 0.5, 0.5, 0.5);
+texture:SetColorTexture(0.5, 0.5, 0.5, 0.5); --This needs testing
 texture:SetAllPoints();
 
 local leaderboardText = leaderBoard:CreateFontString(nil, "ARTWORK", "GameFontNormal");
@@ -138,7 +138,7 @@ local function handler(msg, editbox)
 					if (index ~= -1 and RAT:Eligible(index)) then
 						RAT:PlayerAttended(args[1], args[2]);
 						C_Timer.After(2, function() RAT:UpdatePlayerAlts(args[1]); end);
-						SendChatMessage(L.ADDON .. args[1] .. L.BROADCAST_AWARDED_PLAYER1 .. args[2] .. L.BROADCAST_AWARDED_PLAYER2, "GUILD");
+						C_ChatInfo.SendChatMessage(L.ADDON .. args[1] .. L.BROADCAST_AWARDED_PLAYER1 .. args[2] .. L.BROADCAST_AWARDED_PLAYER2, "GUILD");
 						C_ChatInfo.SendAddonMessage("RATSYSTEM", "SYNCATTENDANCE", "GUILD");
 					else
 						DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. args[1] .. L.ERROR_PLAYER_INELIGIBLE);
@@ -157,7 +157,7 @@ local function handler(msg, editbox)
 					if (index ~= -1 and RAT:Eligible(index)) then
 						RAT:PlayerAbsent(args[1], args[2]);
 						C_Timer.After(2, function() RAT:UpdatePlayerAlts(args[1]); end);
-						SendChatMessage(L.ADDON .. args[1] .. L.BROADCAST_ABSENT_PLAYER1 .. args[2] .. L.BROADCAST_ABSENT_PLAYER2, "GUILD");
+						C_ChatInfo.SendChatMessage(L.ADDON .. args[1] .. L.BROADCAST_ABSENT_PLAYER1 .. args[2] .. L.BROADCAST_ABSENT_PLAYER2, "GUILD");
 						C_ChatInfo.SendAddonMessage("RATSYSTEM", "SYNCATTENDANCE", "GUILD");
 					else
 						DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. args[1] .. L.ERROR_PLAYER_INELIGIBLE);
@@ -176,7 +176,7 @@ local function handler(msg, editbox)
 				if (index ~= -1 and RAT:Eligible(index)) then
 					RAT:StrikePlayer(args[1], amount);
 					C_Timer.After(2, function() RAT:UpdatePlayerAlts(args[1]); end);
-					SendChatMessage(L.ADDON .. args[1] .. L.BROADCAST_STRIKE_PLAYER1 .. amount .. L.BROADCAST_STRIKE_PLAYER2, "GUILD");
+					C_ChatInfo.SendChatMessage(L.ADDON .. args[1] .. L.BROADCAST_STRIKE_PLAYER1 .. amount .. L.BROADCAST_STRIKE_PLAYER2, "GUILD");
 					C_ChatInfo.SendAddonMessage("RATSYSTEM", "SYNCATTENDANCE", "GUILD");
 				else
 					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. args[1] .. L.ERROR_PLAYER_INELIGIBLE);
@@ -191,7 +191,7 @@ local function handler(msg, editbox)
 				if (index ~= -1 and RAT:Eligible(index)) then
 					RAT:Import(args[1], args[2], args[3]);
 					C_Timer.After(2, function() RAT:UpdatePlayerAlts(args[1]); end);
-					SendChatMessage(L.ADDON .. L.BROADCAST_IMPORT_PLAYER1 .. args[1] .. L.BROADCAST_IMPORT_PLAYER2 .. args[2] .. L.BROADCAST_IMPORT_PLAYER3 .. args[3] .. L.BROADCAST_IMPORT_PLAYER4, "GUILD");
+					C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_IMPORT_PLAYER1 .. args[1] .. L.BROADCAST_IMPORT_PLAYER2 .. args[2] .. L.BROADCAST_IMPORT_PLAYER3 .. args[3] .. L.BROADCAST_IMPORT_PLAYER4, "GUILD");
 					C_ChatInfo.SendAddonMessage("RATSYSTEM", "SYNCATTENDANCE", "GUILD");
 				else
 					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. args[1] .. L.ERROR_PLAYER_INELIGIBLE);
@@ -207,7 +207,7 @@ local function handler(msg, editbox)
 				local index = RAT:GetGuildMemberIndex(arg);
 				if (index ~= -1 and RAT:Eligible(index)) then
 					RAT:DeletePlayer(arg);
-					SendChatMessage(L.ADDON .. L.BROADCAST_DELETED_PLAYER .. arg .. L.DOT, "GUILD");
+					C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_DELETED_PLAYER .. arg .. L.DOT, "GUILD");
 					C_ChatInfo.SendAddonMessage("RATSYSTEM", "SYNCATTENDANCE", "GUILD");
 				else
 					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. arg .. L.ERROR_PLAYER_INELIGIBLE);
@@ -226,7 +226,7 @@ local function handler(msg, editbox)
 					RAT:PlayerAbsent(arg, 1);
 					RAT:PlayerAttended(arg, -1);
 					C_Timer.After(2, function() RAT:UpdatePlayerAlts(arg); end);
-					SendChatMessage(L.ADDON .. arg .. L.BROADCAST_SWAPED_PLAYER, "GUILD");
+					C_ChatInfo.SendChatMessage(L.ADDON .. arg .. L.BROADCAST_SWAPED_PLAYER, "GUILD");
 					C_ChatInfo.SendAddonMessage("RATSYSTEM", "SYNCATTENDANCE", "GUILD");
 				else
 					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. arg .. L.ERROR_PLAYER_INELIGIBLE);
@@ -258,7 +258,7 @@ local function handler(msg, editbox)
 							RAT_SavedData.Bench[RAT:GetSize(RAT_SavedData.Bench)+1] = arg;
 							local msg = "BENCH " .. arg;
 							C_ChatInfo.SendAddonMessage("RATSYSTEM", msg, "GUILD");
-							SendChatMessage(L.ADDON .. arg .. L.BROADCAST_BENCHED_PLAYER, "GUILD");
+							C_ChatInfo.SendChatMessage(L.ADDON .. arg .. L.BROADCAST_BENCHED_PLAYER, "GUILD");
 						else
 							DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. arg .. L.ERROR_BENCHED_ALREADY);
 						end
@@ -411,7 +411,7 @@ f:SetScript("OnUpdate", function(self, elapsed)
 		playersRegister = false;
 		ticks = 0;
 		currentIndex = 0;
-		SendChatMessage("RAT: Highest ranked player: " .. RAT:GetHighestRankedPlayer(playersToRank), "RAID",  nil, nil);
+		C_ChatInfo.SendChatMessage("RAT: Highest ranked player: " .. RAT:GetHighestRankedPlayer(playersToRank), "RAID",  nil, nil);
 		playersToRank = {};
 	end
 end);
@@ -470,10 +470,10 @@ f:SetScript("OnEvent", function(self, event, ...)
 					end
 					if (RAT:Eligible(index) and not RAT:IsBenched(sender)) then
 						RAT_SavedData.Bench[RAT:GetSize(RAT_SavedData.Bench)+1] = sender;
-						SendChatMessage(L.ADDON .. sender .. L.BROADCAST_BENCHED_PLAYER, "GUILD");
+						C_ChatInfo.SendChatMessage(L.ADDON .. sender .. L.BROADCAST_BENCHED_PLAYER, "GUILD");
 						C_ChatInfo.SendAddonMessage("RATSYSTEM", "BENCH " .. fullNameSender, "GUILD");
 					elseif (RAT:IsBenched(sender)) then
-						SendChatMessage(L.ADDON .. sender .. L.ERROR_BENCHED_ALREADY, "WHISPER", nil, sender);
+						C_ChatInfo.SendChatMessage(L.ADDON .. sender .. L.ERROR_BENCHED_ALREADY, "WHISPER", nil, sender);
 					end
 				else
 					--Cant Promote
@@ -490,24 +490,24 @@ f:SetScript("OnEvent", function(self, event, ...)
 						if (altNote ~= main and mainIndex ~= -1 and RAT:Eligible(mainIndex) and altIndex ~= -1) then
 							GuildRosterSetOfficerNote(altIndex, main);
 							GuildRosterSetPublicNote(altIndex, mainNote)
-							SendChatMessage(L.ADDON .. sender .. L.SYSTEM_ALT_ADDED .. main .. L.DOT, "WHISPER", nil, sender);
+							C_ChatInfo.SendChatMessage(L.ADDON .. sender .. L.SYSTEM_ALT_ADDED .. main .. L.DOT, "WHISPER", nil, sender);
 						--	RAT:InitAlt(main);
 						--if (not RAT:Contains(RAT_SavedData.AltDb[main].Alts, sender) and mainIndex ~= -1 and RAT:Eligible(mainIndex) and RAT:GetGuildMemberIndex(sender) ~= -1) then
 						--	table.insert(RAT_SavedData.AltDb[main].Alts, sender);
 						--RAT:UpdatePlayerAlts(main);
 						--	C_ChatInfo.SendAddonMessage("RATSYSTEM", "SYNCATTENDANCE", "GUILD");
 						elseif (altNote == main) then
-							SendChatMessage(L.ADDON .. sender .. L.ERROR_ALT_ALREADY .. main .. L.DOT, "WHISPER", nil, sender);
+							C_ChatInfo.SendChatMessage(L.ADDON .. sender .. L.ERROR_ALT_ALREADY .. main .. L.DOT, "WHISPER", nil, sender);
 						else
-							SendChatMessage(L.ADDON .. args[2] .. L.ERROR_PLAYER_INELIGIBLE, "WHISPER", nil, sender);
+							C_ChatInfo.SendChatMessage(L.ADDON .. args[2] .. L.ERROR_PLAYER_INELIGIBLE, "WHISPER", nil, sender);
 						end
 					end
 				else
 					--Cant promote
 				end
 			elseif (arg == "help") then
-				SendChatMessage(L.ADDON .. L.HELP1, "WHISPER", nil, sender);
-				SendChatMessage(L.HELP2, "WHISPER", nil, sender);
+				C_ChatInfo.SendChatMessage(L.ADDON .. L.HELP1, "WHISPER", nil, sender);
+				C_ChatInfo.SendChatMessage(L.HELP2, "WHISPER", nil, sender);
 			end
 		end
 	elseif (event == "CHAT_MSG_ADDON") then

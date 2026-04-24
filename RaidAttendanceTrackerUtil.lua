@@ -54,10 +54,10 @@ function RAT:Broadcast(amount)
 		end
 	end
 	local strings = RAT:ToString(awardedPlayers);
-	SendChatMessage(L.ADDON .. L.BROADCAST_AWARDED_ALL1 .. amount .. L.BROADCAST_AWARDED_ALL2 .. strings[1], "GUILD", "COMMON", nil);
+	C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_AWARDED_ALL1 .. amount .. L.BROADCAST_AWARDED_ALL2 .. strings[1], "GUILD");
 	for i = 2, #strings do
 		C_Timer.After(i*0.5, function()
-			SendChatMessage(strings[i], "GUILD", "COMMON", nil);
+			C_ChatInfo.SendChatMessage(strings[i], "GUILD");
 		end);
 	end
 end
@@ -66,22 +66,22 @@ end
 function RAT:BroadcastAbsent(players)
 	local strings = RAT:ToString(players);
 	C_Timer.After(1.5, function()
-		SendChatMessage(L.ADDON .. L.BROADCAST_ABSENT_ALL .. strings[1], "GUILD", "COMMON", nil);
+		C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_ABSENT_ALL .. strings[1], "GUILD");
 	end);
 	for i = 2, #strings do
 		C_Timer.After(1.5+(i*0.5), function()
-			SendChatMessage(strings[i], "GUILD", "COMMON", nil);
+			C_ChatInfo.SendChatMessage(strings[i], "GUILD");
 		end);
 	end
 end
 --[[
 function RAT:BroadcastStrike(player)
-	SendChatMessage("RAT: following players recieved a strike: " .. player, "GUILD", "COMMON", nil);
+	C_ChatInfo.SendChatMessage("RAT: following players recieved a strike: " .. player, "GUILD");
 end
 ]]
 function RAT:BroadcastNextAward(time)
 	C_Timer.After(4, function()
-		SendChatMessage(L.ADDON .. L.BROADCAST_AWARD_NEXT .. time, "GUILD", "COMMON", nil);
+		C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_AWARD_NEXT .. time, "GUILD");
 	end);
 end
 
@@ -94,7 +94,7 @@ function RAT:BroadcastSummary()
 				local gainedRank = math.abs(RAT_SavedData.Attendance[player].Rank - data.Rank);
 				local preRank = tonumber(RAT_SavedData.Attendance[player].Rank) <= tonumber(data.Rank) and "gained " or "lost ";
 				if (UnitIsConnected(player)) then
-					SendChatMessage(L.SUMMARY1 .. gainedAttendance .. L.SUMMARY2 .. gainedAbsence .. L.SUMMARY3 .. preRank .. gainedRank .. L.SUMMARY4, "WHISPER", "COMMON", player);
+					C_ChatInfo.SendChatMessage(L.SUMMARY1 .. gainedAttendance .. L.SUMMARY2 .. gainedAbsence .. L.SUMMARY3 .. preRank .. gainedRank .. L.SUMMARY4, "WHISPER", nil, player);
 				end
 			end
 		end
@@ -661,11 +661,11 @@ f:SetScript("OnEvent", function(self, event, ...)
 			if (#players > 0) then
 				local strings = RAT:ToString(players);
 				C_Timer.After(0.7, function() 
-					SendChatMessage(L.ADDON .. L.BROADCAST_CALENDAR_PUNISHED .. strings[1], "GUILD", "COMMON");
+					C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_CALENDAR_PUNISHED .. strings[1], "GUILD");
 				end);
 				for i = 2, #strings do
 					C_Timer.After(0.7+(i*0.1), function() 
-						SendChatMessage(strings[i], "GUILD", "COMMON");
+						C_ChatInfo.SendChatMessage(strings[i], "GUILD");
 					end);
 				end
 			end

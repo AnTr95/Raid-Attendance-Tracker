@@ -128,7 +128,7 @@ actionButton:SetScript("OnClick", function(self)
 				RAT_SavedData.Bench[RAT:GetSize(RAT_SavedData.Bench)+1] = pl;
 				local msg = "BENCH " .. pl;
 				C_ChatInfo.SendAddonMessage("RATSYSTEM", msg, "GUILD");
-				SendChatMessage(L.ADDON .. pl .. L.BROADCAST_BENCHED_PLAYER, "GUILD");
+				C_ChatInfo.SendChatMessage(L.ADDON .. pl .. L.BROADCAST_BENCHED_PLAYER, "GUILD");
 			end
 		elseif (selectedAction == "Award") then
 			if (amount ~= 0) then
@@ -138,12 +138,12 @@ actionButton:SetScript("OnClick", function(self)
 				end
 				if (#selectedPlayers > 1) then
 					local strings = RAT:ToString(selectedPlayers);
-					SendChatMessage(L.ADDON .. L.BROADCAST_AWARDED_ALL1 .. amount .. L.BROADCAST_AWARDED_ALL2 .. strings[1], "GUILD", "COMMON", nil);
+					C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_AWARDED_ALL1 .. amount .. L.BROADCAST_AWARDED_ALL2 .. strings[1], "GUILD");
 					for i = 2, #strings do
-						SendChatMessage(strings[i], "GUILD", "COMMON", nil);
+						C_ChatInfo.SendChatMessage(strings[i], "GUILD");
 					end
 				else
-					SendChatMessage(L.ADDON .. selectedPlayers[1] .. L.BROADCAST_AWARDED_PLAYER1 .. amount .. L.BROADCAST_AWARDED_PLAYER2, "GUILD");
+					C_ChatInfo.SendChatMessage(L.ADDON .. selectedPlayers[1] .. L.BROADCAST_AWARDED_PLAYER1 .. amount .. L.BROADCAST_AWARDED_PLAYER2, "GUILD");
 				end
 				C_ChatInfo.SendAddonMessage("RATSYSTEM", "SYNCATTENDANCE", "GUILD");
 				RAT:SetLastAttending(selectedPlayers);
@@ -158,12 +158,12 @@ actionButton:SetScript("OnClick", function(self)
 				end
 				if (#selectedPlayers > 1) then
 					local strings = RAT:ToString(selectedPlayers);
-					SendChatMessage(L.ADDON .. L.BROADCAST_CC_ABSENT_PLAYER1 .. amount .. L.BROADCAST_CC_ABSENT_PLAYER2 .. strings[1], "GUILD", "COMMON", nil);
+					C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_CC_ABSENT_PLAYER1 .. amount .. L.BROADCAST_CC_ABSENT_PLAYER2 .. strings[1], "GUILD");
 					for i = 2, #strings do
-						SendChatMessage(strings[i], "GUILD", "COMMON", nil);
+						C_ChatInfo.SendChatMessage(strings[i], "GUILD");
 					end
 				else
-					SendChatMessage(L.ADDON .. selectedPlayers[1] .. L.BROADCAST_ABSENT_PLAYER1 .. amount .. L.BROADCAST_ABSENT_PLAYER2, "GUILD");
+					C_ChatInfo.SendChatMessage(L.ADDON .. selectedPlayers[1] .. L.BROADCAST_ABSENT_PLAYER1 .. amount .. L.BROADCAST_ABSENT_PLAYER2, "GUILD");
 				end
 				C_ChatInfo.SendAddonMessage("RATSYSTEM", "SYNCATTENDANCE", "GUILD");
 				RAT:SetLastAttending({});
@@ -175,7 +175,7 @@ actionButton:SetScript("OnClick", function(self)
 				for k, pl in pairs(selectedPlayers) do
 					RAT:StrikePlayer(pl, amount);
 					C_Timer.After(2, function() RAT:UpdatePlayerAlts(pl); end);
-					SendChatMessage(L.ADDON .. pl .. L.BROADCAST_STRIKE_PLAYER1 .. amount .. L.BROADCAST_STRIKE_PLAYER2, "GUILD");
+					C_ChatInfo.SendChatMessage(L.ADDON .. pl .. L.BROADCAST_STRIKE_PLAYER1 .. amount .. L.BROADCAST_STRIKE_PLAYER2, "GUILD");
 				end
 				C_ChatInfo.SendAddonMessage("RATSYSTEM", "SYNCATTENDANCE", "GUILD");
 			end
@@ -369,7 +369,7 @@ StaticPopupDialogs["RAT_DELETE_BUTTON"] = {
 			end
 		end
 		RAT:Sync();
-		SendChatMessage(L.ADDON .. Ambiguate(UnitName("player"), "none") .. L.SYSTEM_DELETED_DATA, "GUILD");
+		C_ChatInfo.SendChatMessage(L.ADDON .. Ambiguate(UnitName("player"), "none") .. L.SYSTEM_DELETED_DATA, "GUILD");
 	end,
 	EditBoxOnTextChanged = function(self, data)
 		local input = self:GetText();

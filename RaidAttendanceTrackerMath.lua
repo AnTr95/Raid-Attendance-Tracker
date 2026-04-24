@@ -315,7 +315,7 @@ function RAT:Undo(lastAttending, lastAbsent, lastAmount)
 		RAT:PlayerAbsent(v, -lastAmount);
 	end
 	RAT:UpdateRank();
-	SendChatMessage(L.ADDON .. L.BROADCAST_UNDONE_AWARD, "GUILD");
+	C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_UNDONE_AWARD, "GUILD");
 	RAT:SetLastAmount(-lastAmount);
 	C_Timer.After(2.5, function() RAT:UpdateAllAlts(); end);
 end
