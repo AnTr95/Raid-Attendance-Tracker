@@ -38,6 +38,55 @@ function RAT:InitRaid()
 	end
 end
 
+function RAT:InitEligibleGuildMembers()
+	if (not IsInGuild()) then return; end
+
+	local currentGuildMembers = {};
+	for i = 1, GetNumGuildMembers() do
+		local fullName = select(1, GetGuildRosterInfo(i));
+		if (type(fullName) == "string" and fullName ~= "") then
+			local playerName = Ambiguate(fullName, "none");
+			if (playerName and playerName ~= "") then
+				currentGuildMembers[playerName] = true;
+				if (not RAT:ContainsKey(RAT_SavedData.Attendance, playerName)) then
+					if (RAT:Eligible(i) or RAT:GetMain(playerName)) then
+						RAT:InitPlayer(playerName);
+					end
+				end
+			end
+		end
+	end
+
+	for playerName, data in pairs(RAT_SavedData.Attendance or {}) do
+		local index = RAT:GetGuildMemberIndex(playerName);
+		local shouldKeep = currentGuildMembers[playerName] and (index ~= -1) and (RAT:Eligible(index) or RAT:GetMain(playerName));
+		if (not shouldKeep) then
+			RAT_SavedData.Attendance[playerName] = nil;
+			RAT_SavedData.Summary[playerName] = nil;
+		end
+	end
+
+	local remainingRanks = {};
+	for _, rankName in ipairs(RAT_SavedData.Ranks or {}) do
+		if (RAT_SavedData.Attendance[rankName]) then
+			remainingRanks[#remainingRanks+1] = rankName;
+		end
+	end
+	RAT_SavedData.Ranks = remainingRanks;
+	RAT:UpdateRank();
+end
+
+local function addRankEntry(playerName)
+	if (not playerName or playerName == "") then return end
+	if (not RAT_SavedData.Ranks) then RAT_SavedData.Ranks = {}; end
+	for _, existingName in ipairs(RAT_SavedData.Ranks) do
+		if (existingName == playerName) then
+			return;
+		end
+	end
+	RAT_SavedData.Ranks[RAT:GetSize(RAT_SavedData.Ranks)+1] = playerName;
+end
+
 function RAT:InitPlayer(playerName)
 	local index = RAT:GetGuildMemberIndex(playerName);
 	if (index ~= -1) then
@@ -50,8 +99,9 @@ function RAT:InitPlayer(playerName)
 					Strikes = 0,
 					Rank = 99,
 					Score = 0,
+					LastModified = GetServerTime(),
 				};
-				RAT_SavedData.Ranks[RAT:GetSize(RAT_SavedData.Ranks)+1] = playerName;
+				addRankEntry(playerName);
 			end
 		end
 	end
@@ -117,9 +167,20 @@ function RAT:StrikePlayer(playerName, strikes)
 				RAT:InitPlayer(playerName);
 			end
 			RAT_SavedData.Attendance[playerName].Strikes = RAT_SavedData.Attendance[playerName].Strikes + strikes;
+			RAT_SavedData.Attendance[playerName].LastModified = GetServerTime();
 			RAT:UpdateNote(playerName, index);
-			--RAT:BroadcastStrike(playerName);
 			RAT:LogStrike(playerName, strikes, tostring(date()));
+			-- Broadcast the update to all players
+			if (C_GuildInfo.CanEditOfficerNote()) then
+				RAT:BroadcastUpdate(playerName, {
+					Attended = RAT_SavedData.Attendance[playerName].Attended,
+					Absent = RAT_SavedData.Attendance[playerName].Absent,
+					Percent = RAT_SavedData.Attendance[playerName].Percent,
+					Strikes = RAT_SavedData.Attendance[playerName].Strikes,
+					Rank = RAT_SavedData.Attendance[playerName].Rank,
+					Score = RAT_SavedData.Attendance[playerName].Score,
+				});
+			end
 		end
 	end
 end
@@ -140,7 +201,19 @@ function RAT:Import(playerName, attended, absent)
 			RAT_SavedData.Attendance[playerName].Absent = absent;
 			RAT_SavedData.Attendance[playerName].Percent = RAT:CalculatePercent(playerName);
 			RAT_SavedData.Attendance[playerName].Score = RAT:CalculateScore(playerName);
+			RAT_SavedData.Attendance[playerName].LastModified = GetServerTime();
 			RAT:UpdateRank();
+			-- Broadcast the update to all players
+			if (C_GuildInfo.CanEditOfficerNote()) then
+				RAT:BroadcastUpdate(playerName, {
+					Attended = RAT_SavedData.Attendance[playerName].Attended,
+					Absent = RAT_SavedData.Attendance[playerName].Absent,
+					Percent = RAT_SavedData.Attendance[playerName].Percent,
+					Strikes = RAT_SavedData.Attendance[playerName].Strikes,
+					Rank = RAT_SavedData.Attendance[playerName].Rank,
+					Score = RAT_SavedData.Attendance[playerName].Score,
+				});
+			end
 		end
 	end
 end
@@ -262,6 +335,10 @@ function RAT:AllAttended(attended)
 			RAT:Broadcast(attended);
 			RAT:GetAbsentPlayers(attended);
 			RAT:UpdateRank();
+			-- Broadcast full sync to all players
+			if (C_GuildInfo.CanEditOfficerNote()) then
+				RAT:BroadcastFullSync();
+			end
 			RAT:SetLastAttending(attendingPlayers);
 			RAT:SetLastAmount(attended);
 		end);
@@ -281,8 +358,20 @@ function RAT:PlayerAttended(playerName, attended)
 			RAT_SavedData.Attendance[playerName].Attended = (RAT:GetAttendance(playerName) + attended);
 			RAT_SavedData.Attendance[playerName].Percent = RAT:CalculatePercent(playerName);
 			RAT_SavedData.Attendance[playerName].Score = RAT:CalculateScore(playerName);
+			RAT_SavedData.Attendance[playerName].LastModified = GetServerTime();
 			RAT:UpdateNote(playerName, index);
 			RAT:LogAttended(playerName, attended, tostring(date()));
+			-- Broadcast the update to all players
+			if (C_GuildInfo.CanEditOfficerNote()) then
+				RAT:BroadcastUpdate(playerName, {
+					Attended = RAT_SavedData.Attendance[playerName].Attended,
+					Absent = RAT_SavedData.Attendance[playerName].Absent,
+					Percent = RAT_SavedData.Attendance[playerName].Percent,
+					Strikes = RAT_SavedData.Attendance[playerName].Strikes,
+					Rank = RAT_SavedData.Attendance[playerName].Rank,
+					Score = RAT_SavedData.Attendance[playerName].Score,
+				});
+			end
 		end
 	end
 end
@@ -302,8 +391,20 @@ function RAT:PlayerAbsent(playerName, absent)
 			RAT_SavedData.Attendance[playerName].Absent = RAT_SavedData.Attendance[playerName].Absent + absent;
 			RAT_SavedData.Attendance[playerName].Percent = RAT:CalculatePercent(playerName);
 			RAT_SavedData.Attendance[playerName].Score = RAT:CalculateScore(playerName);
+			RAT_SavedData.Attendance[playerName].LastModified = GetServerTime();
 			RAT:UpdateNote(playerName, index);
 			RAT:LogAbsent(playerName, absent, tostring(date()));
+			-- Broadcast the update to all players
+			if (C_GuildInfo.CanEditOfficerNote()) then
+				RAT:BroadcastUpdate(playerName, {
+					Attended = RAT_SavedData.Attendance[playerName].Attended,
+					Absent = RAT_SavedData.Attendance[playerName].Absent,
+					Percent = RAT_SavedData.Attendance[playerName].Percent,
+					Strikes = RAT_SavedData.Attendance[playerName].Strikes,
+					Rank = RAT_SavedData.Attendance[playerName].Rank,
+					Score = RAT_SavedData.Attendance[playerName].Score,
+				});
+			end
 		end
 	end
 end
@@ -315,6 +416,10 @@ function RAT:Undo(lastAttending, lastAbsent, lastAmount)
 		RAT:PlayerAbsent(v, -lastAmount);
 	end
 	RAT:UpdateRank();
+	-- Broadcast full sync after undo
+	if (C_GuildInfo.CanEditOfficerNote()) then
+		RAT:BroadcastFullSync();
+	end
 	C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_UNDONE_AWARD, "GUILD");
 	RAT:SetLastAmount(-lastAmount);
 	C_Timer.After(2.5, function() RAT:UpdateAllAlts(); end);

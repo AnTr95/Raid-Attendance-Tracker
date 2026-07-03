@@ -11,6 +11,7 @@
 
 Localization.enUS.lua
 RaidAttendanceTracker.lua
+RaidAttendanceTrackerSync.lua
 Options\RaidTimes.lua
 Options\RaiderRanks.lua
 Options\Settings.lua

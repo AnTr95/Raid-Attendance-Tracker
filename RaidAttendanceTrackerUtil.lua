@@ -254,11 +254,17 @@ end
 	Returns the guild members index based of a name, if no name is found return -1
 ]]
 function RAT:GetGuildMemberIndex(name)
+	if (type(name) ~= "string" or name == "") then
+		return -1;
+	end
 	name = Ambiguate(name, "none");
 	for i = 1, GetNumGuildMembers() do
-		local fullName = Ambiguate(GetGuildRosterInfo(i), "none");
-		if (name == fullName) then
-			return i;
+		local fullName = select(1, GetGuildRosterInfo(i));
+		if (type(fullName) == "string" and fullName ~= "") then
+			fullName = Ambiguate(fullName, "none");
+			if (name == fullName) then
+				return i;
+			end
 		end
 	end
 	return -1;
@@ -266,8 +272,11 @@ end
 
 function RAT:InitGuildMemberIndexes()
 	for i = 1, GetNumGuildMembers() do
-		local fullName = Ambiguate(GetGuildRosterInfo(i), "none");
-		guildMemberIndexes[fullName] = i;
+		local fullName = select(1, GetGuildRosterInfo(i));
+		if (type(fullName) == "string" and fullName ~= "") then
+			fullName = Ambiguate(fullName, "none");
+			guildMemberIndexes[fullName] = i;
+		end
 	end
 	return guildMemberIndexes;
 end
@@ -280,21 +289,11 @@ function RAT:GetGuildMemberIndexLookup(name)
 end
 
 function RAT:UpdateNote(name, index)
-	if (not RAT:Contains(PAU, name)) then
-		table.insert(PAU, name);
-	end
-	if (index ~= -1) then
-		local attendance = RAT_SavedData.Attendance[name].Attended;
-		local absent = RAT_SavedData.Attendance[name].Absent;
-		local percent = RAT_SavedData.Attendance[name].Percent;
-		local strikes = RAT_SavedData.Attendance[name].Strikes;
-		local rank = RAT_SavedData.Attendance[name].Rank;
-		--R:99 AP:9999 100% M:999 S9/9
-		GuildRosterSetOfficerNote(index, "R:" .. rank .. " AP:" .. attendance .. " " .. percent .. "%" .. " M:" .. absent .. " S:" .. strikes .. "/3");
-		GuildRosterSetPublicNote(index, "R:" .. rank .. " AP:" .. attendance .. " " .. percent .. "%" .. " M:" .. absent .. " S:" .. strikes .. "/3");
-		if (string.len(select(8,GetGuildRosterInfo(index))) > 31) then
-			DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000" .. L.ADDON .. L.ERROR_OFFICER_NOTE_TOO_LONG1 .. name .. L.ERROR_OFFICER_NOTE_TOO_LONG2);
-		end
+	-- DEPRECATED: Officer notes are no longer writable in 12.0
+	-- Data is now synced via addon messages and saved variables instead
+	-- This function is kept for compatibility but does nothing
+	if index ~= -1 then
+		RAT:SendDebugMessage("UpdateNote called for " .. name .. " - using sync system instead");
 	end
 end
 
@@ -406,61 +405,13 @@ function RAT:GetHighestRankedPlayer(players)
 end
 
 function RAT:Sync()
-	--Read all notes and override RAT_SavedData.Attendance and RAT_SavedData.Ranks
-	--Points of improvement: index is redundant and equal to i? Secondly thescore is being updated constantly instead of after the entire loop is done
-	RAT_SavedData.Attendance = {};
-	RAT_SavedData.Ranks = {};
-	RAT:InitGuildMemberIndexes();
-	RAT:SendDebugMessage("Syncing database with current notes. Iterating on all guild members...");
-	for i = 1, GetNumGuildMembers() do
-		local name = Ambiguate(select(1, GetGuildRosterInfo(i)), "none");
-		if (RAT:Eligible(i) and not RAT:GetMain(name)) then
-			local note = select(8, GetGuildRosterInfo(i));
-			if (note) then
-				RAT:SendDebugMessage("Iterating... at: " .. name .. " with at index: " .. i .. " and note is: " .. note);
-			else
-				RAT:SendDebugMessage("Iterating... at: " .. name .. " with at index: " .. i .. " and note is nil ");
-			end
-			local index = RAT:GetGuildMemberIndex(name);
-			if (not note:find("R:") or not note:find("AP:") or not note:find("M:") or not note:find("S:") or not note:find("%%")) then
-				GuildRosterSetOfficerNote(index, "");
-				note = "";
-				DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000" .. L.ADDON .. name .. L.ERROR_NOTE_SYNTAX);
-				RAT:SendDebugMessage("The note of " .. name .. " is corrupted and is being reset");
-			end
-			RAT:InitPlayer(name);
-			local vars = RAT:Split(note);
-			for k, v in pairs(vars) do
-				RAT:SendDebugMessage("Note of " .. name .. " has been split and is being iterated over at: " .. v);
-				local indexOf = v:find(":");
-				if (v:find("R:")) then
-					RAT_SavedData.Attendance[name].Rank = v:sub(indexOf+1);
-					RAT:SendDebugMessage("The rank data of " .. name .. " is set to " .. RAT_SavedData.Attendance[name].Rank);
-				elseif (v:find("AP:")) then
-					RAT_SavedData.Attendance[name].Attended = v:sub(indexOf+1);
-					RAT:SendDebugMessage("The AP data of " .. name .. " is set to " .. RAT_SavedData.Attendance[name].Attended);
-				elseif (v:find("M:")) then
-					RAT_SavedData.Attendance[name].Absent = v:sub(indexOf+1);
-					RAT:SendDebugMessage("The absent data of " .. name .. " is set to " .. RAT_SavedData.Attendance[name].Absent);
-				elseif (v:find("S:")) then
-					local indexOfTwo = v:find("%/");
-					RAT_SavedData.Attendance[name].Strikes = v:sub(indexOf+1, indexOfTwo-1);
-					RAT:SendDebugMessage("The strikes data of " .. name .. " is set to " .. RAT_SavedData.Attendance[name].Strikes);
-				elseif (v:find("%%")) then
-					local indexOfTwo = v:find("%%");
-					RAT_SavedData.Attendance[name].Percent = v:sub(1, indexOfTwo-1);
-					RAT:SendDebugMessage("The percent data of " .. name .. " is set to " .. RAT_SavedData.Attendance[name].Percent);
-				end
-				RAT_SavedData.Attendance[name].Score = RAT:CalculateScore(name);
-				RAT:SendDebugMessage("The score data of " .. name .. " is set to " .. RAT_SavedData.Attendance[name].Score);
-			end
-			if (note == "") then
-				RAT:UpdateNote(name, index);
-			end
-		end
+	-- Compatibility wrapper for legacy Sync() calls.
+	-- New synchronization is handled via addon messages (FULLSYNC).
+	if (RAT:IsMaster()) then
+		RAT:BroadcastFullSync();
+	else
+		RAT:SendDebugMessage("Note: Sync() is deprecated. Use BroadcastFullSync() instead.");
 	end
-	RAT:InsertionSort();
-	--RAT:UpdateAllAlts();
 end
 
 --[[

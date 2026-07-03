@@ -206,6 +206,10 @@ function RAT:SuggestRaidDays()
 	end
 	--Scan guild info for general raid times
 	if (not raidTimesFound) then
+		local startHour = nil;
+		local startMinute = nil;
+		local finishHour = nil;
+		local finishMinute = nil;
 		for i, word in pairs(gInfoWords) do
 			if (word:match("[%d%.%-:]+")) then --Only match numbers, ., - and :
 				local times = {};
@@ -1082,7 +1086,7 @@ function RAT:OpenSetupPage(page)
 		infoText:SetText(L.SETUP_COMPLETED_INFO_TEXT2);
 	elseif (page == 7) then
 		setupFrame:Hide();
-		RAT:Sync();
+		RAT:InitEligibleGuildMembers();
 	end
 	pageText:SetText(L.OPTIONS_PAGE_TEXT1 .. page .. L.OPTIONS_PAGE_TEXT2);
 end
