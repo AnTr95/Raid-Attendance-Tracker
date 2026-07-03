@@ -93,7 +93,7 @@ function RAT:DeserializeAttendanceData(dataString)
 			};
 		end
 	end
-	
+
 	return result;
 end
 
@@ -102,7 +102,7 @@ function RAT:ChunkData(dataString, chunkSize)
 	-- Returns array of chunks
 	local chunks = {};
 	local currentChunk = "";
-	
+
 	for entry in string.gmatch(dataString, "[^|]+") do
 		if string.len(currentChunk) + string.len(entry) + 1 > chunkSize then
 			if currentChunk ~= "" then
@@ -121,11 +121,11 @@ function RAT:ChunkData(dataString, chunkSize)
 			end
 		end
 	end
-	
+
 	if currentChunk ~= "" then
 		table.insert(chunks, currentChunk);
 	end
-	
+
 	return chunks;
 end
 
@@ -136,18 +136,18 @@ end
 function RAT:ValidateUpdate(playerName, newData, senderCanEditOfficial, senderTimestamp)
 	-- Validate incoming update from another player
 	-- Returns: isValid, errorMessage
-	
+
 	-- Only accept if sender can edit officer notes
 	if not senderCanEditOfficial then
 		return false, "Sender cannot edit officer notes";
 	end
-	
+
 	-- Check if timestamp is newer than local copy
 	local localData = RAT_SavedData.Attendance[playerName];
 	if localData and localData.LastModified and senderTimestamp <= localData.LastModified then
 		return false, "Update is not newer than local data";
 	end
-	
+
 	-- Validate numeric ranges
 	if newData.Attended and newData.Attended < 0 then
 		return false, "Invalid attendance (negative)";
@@ -164,7 +164,7 @@ function RAT:ValidateUpdate(playerName, newData, senderCanEditOfficial, senderTi
 	if newData.Rank and (newData.Rank < 0 or newData.Rank > 9999) then
 		return false, "Invalid rank (out of range)";
 	end
-	
+
 	-- Validate score can be recalculated
 	if newData.Attended and newData.Absent and newData.Percent then
 		local calculatedPercent = RAT:CalculatePercent(playerName);
@@ -173,7 +173,7 @@ function RAT:ValidateUpdate(playerName, newData, senderCanEditOfficial, senderTi
 			RAT:SendDebugMessage("WARNING: Percent mismatch for " .. playerName .. " (expected " .. calculatedPercent .. ", got " .. newData.Percent .. ")");
 		end
 	end
-	
+
 	-- Recalculate score
 	if newData.Attended and newData.Percent then
 		local tempData = {
@@ -182,12 +182,12 @@ function RAT:ValidateUpdate(playerName, newData, senderCanEditOfficial, senderTi
 		};
 		RAT_SavedData.Attendance[playerName] = tempData;
 		local calculatedScore = RAT:CalculateScore(playerName);
-		
+
 		if newData.Score and math.abs(calculatedScore - newData.Score) > 0.1 then
 			return false, "Score does not match calculation (tampering detected)";
 		end
 	end
-	
+
 	return true, "Valid";
 end
 
@@ -199,17 +199,17 @@ function RAT:BroadcastFullSync()
 	-- Master broadcasts full attendance data to guild
 	if not RAT:IsMaster() then return; end
 	if not IsInGuild() then return; end
-	
+
 	local dataString = RAT:SerializeAttendanceData();
 	local chunks = RAT:ChunkData(dataString, 240); -- Leave room for prefix
 	local totalChunks = #chunks;
 	local timestamp = GetServerTime();
-	
+
 	for chunkNum, chunkData in ipairs(chunks) do
 		local batchLabel = chunkNum .. "of" .. totalChunks;
 		local msg = "FULLSYNC|" .. batchLabel .. "|" .. chunkData;
 		C_ChatInfo.SendAddonMessage("RATSYSTEM", msg, "GUILD");
-		
+
 		-- Rate limit messages
 		if chunkNum < totalChunks then
 			C_Timer.After(0.1, function() end);
@@ -223,12 +223,12 @@ function RAT:BroadcastUpdate(playerName, changes)
 	if not RAT:IsMaster() then return; end
 	if not IsInGuild() then return; end
 	if not C_GuildInfo.CanEditOfficerNote() then return; end
-	
+
 	local timestamp = GetServerTime();
 	local playerData = RAT_SavedData.Attendance[playerName];
-	
+
 	if not playerData then return; end
-	
+
 	local msg = "UPDATE|" .. timestamp .. "|" .. playerName .. ":" ..
 		(changes.Attended or playerData.Attended) .. ":" ..
 		(changes.Absent or playerData.Absent) .. ":" ..
@@ -236,7 +236,7 @@ function RAT:BroadcastUpdate(playerName, changes)
 		(changes.Strikes or playerData.Strikes) .. ":" ..
 		(changes.Rank or playerData.Rank) .. ":" ..
 		RAT:Round(changes.Score or playerData.Score);
-	
+
 	C_ChatInfo.SendAddonMessage("RATSYSTEM", msg, "GUILD");
 end
 
@@ -249,18 +249,18 @@ function RAT:ReceiveFullSync(batchLabel, dataChunk, senderName)
 	local batchNum, totalBatches = string.match(batchLabel, "(%d+)of(%d+)");
 	batchNum = tonumber(batchNum);
 	totalBatches = tonumber(totalBatches);
-	
+
 	if not batchNum or not totalBatches then
 		RAT:SendDebugMessage("Invalid batch label: " .. batchLabel);
 		return;
 	end
-	
+
 	if not RAT_SavedData.FullSyncBuffer then
 		RAT_SavedData.FullSyncBuffer = {};
 	end
-	
+
 	RAT_SavedData.FullSyncBuffer[batchNum] = dataChunk;
-	
+
 	-- Check if we have all chunks
 	if RAT:GetSize(RAT_SavedData.FullSyncBuffer) == totalBatches then
 		local fullData = "";
@@ -272,16 +272,16 @@ function RAT:ReceiveFullSync(batchLabel, dataChunk, senderName)
 				fullData = fullData .. RAT_SavedData.FullSyncBuffer[i];
 			end
 		end
-		
+
 		-- Deserialize and apply
 		local newData = RAT:DeserializeAttendanceData(fullData);
 		for playerName, playerData in pairs(newData) do
 			RAT_SavedData.Attendance[playerName] = playerData;
 		end
-		
+
 		-- Clear buffer
 		RAT_SavedData.FullSyncBuffer = {};
-		
+
 		RAT:SendDebugMessage("Full sync applied from " .. senderName);
 	end
 end
@@ -289,9 +289,9 @@ end
 function RAT:ReceiveUpdate(timestamp, updateData, senderName, senderCanEditOfficer)
 	-- Parse: PlayerName:Attended:Absent:Percent:Strikes:Rank:Score
 	local parts = RAT:Split(updateData .. ":");
-	
+
 	if #parts < 7 then return; end
-	
+
 	local playerName = parts[1];
 	local newData = {
 		Attended = tonumber(parts[2]) or 0,
@@ -301,23 +301,23 @@ function RAT:ReceiveUpdate(timestamp, updateData, senderName, senderCanEditOffic
 		Rank = tonumber(parts[6]) or 99,
 		Score = tonumber(parts[7]) or 0,
 	};
-	
+
 	-- Validate
 	local isValid, errMsg = RAT:ValidateUpdate(playerName, newData, senderCanEditOfficer, timestamp);
 	if not isValid then
 		RAT:SendDebugMessage("UPDATE REJECTED for " .. playerName .. ": " .. errMsg);
 		return;
 	end
-	
+
 	-- Apply update
 	if not RAT_SavedData.Attendance[playerName] then
 		RAT:InitPlayer(playerName);
 	end
-	
+
 	newData.LastModified = timestamp;
 	for key, value in pairs(newData) do
 		RAT_SavedData.Attendance[playerName][key] = value;
 	end
-	
+
 	RAT:SendDebugMessage("UPDATE applied for " .. playerName .. " from " .. senderName);
 end

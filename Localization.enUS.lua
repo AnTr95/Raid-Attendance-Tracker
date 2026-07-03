@@ -33,6 +33,9 @@ L.ERROR_CHEAT_DETECTED1 = "CHEAT DETECTED in ";
 L.ERROR_CHEAT_DETECTED2 = "'s note. Correct values are: ";
 L.ERROR_CHEAT_DETECTED3 = " Values found are: ";
 L.ERROR_NOT_GUILD_GROUP = "Did not award raid as it is not a guild group. Use: /rat award 1 to award anyway.";
+L.STATS_RESPONSE = "Your current stats are the following: Rank %s. AP: %s M: %s %s%%";
+L.STATS_RESPONSE_PREFIX = "Your current stats are the following:";
+L.STATS_NO_DATA = "No attendance data found for you yet.";
 
 L.SYNTAX_AWARD = "Incorrect syntax. Usage: /rat award Player Points(number) or /rat award Points(number).";
 L.SYNTAX_ABSENT = "Incorrect syntax. Usage: /rat absent Player Points(number).";

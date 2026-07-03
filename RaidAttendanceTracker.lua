@@ -89,6 +89,21 @@ closeButton:HookScript("OnClick", function(frame)
 	leaderBoard:Hide();
 end);
 
+local function getLeaderboardDisplayName(playerName)
+	if (type(playerName) ~= "string" or playerName == "") then
+		return "";
+	end
+	local displayName = Ambiguate(playerName, "short");
+	if (displayName and displayName ~= "" and displayName ~= playerName) then
+		return displayName;
+	end
+	local simplifiedName = playerName:match("^(.-)%-.+$") or playerName;
+	if (simplifiedName and simplifiedName ~= "") then
+		return simplifiedName;
+	end
+	return playerName;
+end
+
 local function getLeaderboardColor(playerName)
 	local index = RAT:GetGuildMemberIndex(playerName);
 	if (index and index ~= -1) then
@@ -117,7 +132,8 @@ local function updateLeaderboard()
 				local attended = tonumber(playerData.Attended) or 0;
 				local missed = tonumber(playerData.Absent) or 0;
 				local percent = tonumber(playerData.Percent) or 0;
-				local coloredName = getLeaderboardColor(v) .. v .. "|r";
+				local displayName = getLeaderboardDisplayName(v);
+				local coloredName = getLeaderboardColor(v) .. displayName .. "|r";
 				text = text .. string.format("%d. %s - AP: %d M: %d %d%%\n", plRank, coloredName, attended, missed, percent);
 			end
 		end
@@ -141,6 +157,18 @@ function RAT:SendDebugMessage(msg)
 		RAT_SavedData.DebugLog[#RAT_SavedData.DebugLog+1] = tostring(date("%y/%m/%d %H:%M:%S")) .." : " .. msg;
 		DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.DEBUG .. L.ADDON .. msg);
 	end
+end
+
+local function normalizeWhisperMessage(msg)
+	if (type(msg) ~= "string") then
+		return "";
+	end
+	return string.lower(msg):gsub("^%s+", ""):gsub("%s+$", "");
+end
+
+local function isRatWhisperCommand(msg)
+	local text = normalizeWhisperMessage(msg);
+	return text == "!rat" or text:match("^!rat%s") ~= nil;
 end
 
 --[[
@@ -508,10 +536,10 @@ f:SetScript("OnEvent", function(self, event, ...)
 	elseif (event == "CHAT_MSG_WHISPER") then
 		local message, sender = ...;
 		local fullNameSender = sender;
-		message = string.lower(message);
+		local normalizedMessage = normalizeWhisperMessage(message);
 		sender = Ambiguate(sender, "none");
-		local arg = RAT:GetArg(message);
-		local cmd = RAT:GetCmd(message);
+		local arg = RAT:GetArg(normalizedMessage);
+		local cmd = RAT:GetCmd(normalizedMessage);
 		if (cmd == "!rat") then
 			local args = RAT:Split(arg);
 			local index = RAT:GetGuildMemberIndex(sender);
@@ -551,6 +579,21 @@ f:SetScript("OnEvent", function(self, event, ...)
 			elseif (arg == "help") then
 				C_ChatInfo.SendChatMessage(L.ADDON .. L.HELP1, "WHISPER", nil, sender);
 				C_ChatInfo.SendChatMessage(L.HELP2, "WHISPER", nil, sender);
+			elseif (arg == "stats") then
+				local playerName = sender;
+				if (RAT:GetMain(sender)) then
+					playerName = RAT:GetMain(sender);
+				end
+				local playerData = RAT_SavedData.Attendance[playerName];
+				if (playerData) then
+					local rank = playerData.Rank or 99;
+					local attended = tonumber(playerData.Attended) or 0;
+					local missed = tonumber(playerData.Absent) or 0;
+					local percent = tonumber(playerData.Percent) or 0;
+					C_ChatInfo.SendChatMessage(L.ADDON .. string.format(L.STATS_RESPONSE, rank, attended, missed, percent), "WHISPER", nil, sender);
+				else
+					C_ChatInfo.SendChatMessage(L.ADDON .. L.STATS_NO_DATA, "WHISPER", nil, sender);
+				end
 			end
 		end
 	elseif (event == "CHAT_MSG_ADDON") then
@@ -729,14 +772,14 @@ end
 --CalendarGetDayEvent(monthoffset, day, index)
 
 local function benchFilterRecieve(self, event, msg)
-	if (msg == "!rat bench") then
+	if (isRatWhisperCommand(msg) and normalizeWhisperMessage(msg) == "!rat bench") then
 		return true;
 	end
 	return false;
 end
 
 local function helpFilterRecieve(self, event, msg)
-	if (msg == "!rat help") then
+	if (isRatWhisperCommand(msg) and normalizeWhisperMessage(msg) == "!rat help") then
 		return true;
 	end
 	return false;
@@ -750,21 +793,35 @@ local function helpFilterSend(self, event, msg)
 end
 
 local function altFilterSend(self, event, msg)
-	if (msg:find(L.ADDON) and (msg:find(L.SYSTEM_ALT_ADDED .. L.DOT) or (msg:find(L.ERROR_PLAYER_INELIGIBLE_OR) and msg:find(L.ERROR_PLAYER_INELIGIBLE)) or msg:find(L.ERROR_ALT_ALREADY))) then
+	if (msg and msg:find(L.ADDON) and (msg:find(L.SYSTEM_ALT_ADDED .. L.DOT) or (msg:find(L.ERROR_PLAYER_INELIGIBLE_OR) and msg:find(L.ERROR_PLAYER_INELIGIBLE)) or msg:find(L.ERROR_ALT_ALREADY))) then
 		return true;
 	end
 	return false;
 end
 
 local function altFilterRecieve(self, event, msg)
-	if (msg:find("!rat alt") and msg ~= L.HELP2) then
+	if (isRatWhisperCommand(msg) and normalizeWhisperMessage(msg):match("^!rat%s+alt") and msg ~= L.HELP2) then
 		return true;
 	end
 	return false;
 end
 
 local function benchFilterSend(self, event, msg)
-	if (msg:find(L.ADDON) and msg:find(L.ERROR_BENCHED_ALREADY)) then
+	if (msg and msg:find(L.ADDON) and msg:find(L.ERROR_BENCHED_ALREADY)) then
+		return true;
+	end
+	return false;
+end
+
+local function statsFilterRecieve(self, event, msg)
+	if (isRatWhisperCommand(msg) and normalizeWhisperMessage(msg) == "!rat stats") then
+		return true;
+	end
+	return false;
+end
+
+local function statsFilterSend(self, event, msg)
+	if (msg and msg:find(L.ADDON) and (msg:find(L.STATS_RESPONSE_PREFIX) or msg:find(L.ADDON .. L.STATS_NO_DATA))) then
 		return true;
 	end
 	return false;
@@ -773,9 +830,11 @@ end
 ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", benchFilterRecieve);
 ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", helpFilterRecieve);
 ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", altFilterRecieve);
+ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", statsFilterRecieve);
 ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", helpFilterSend);
 ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", altFilterSend);
 ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", benchFilterSend);
+ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", statsFilterSend);
 
 local options = CreateFrame("Frame");
 options:Hide();
