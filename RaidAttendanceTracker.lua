@@ -389,6 +389,7 @@ f:RegisterEvent("CHAT_MSG_RAID_LEADER");
 f:RegisterEvent("CHAT_MSG_WHISPER");
 f:RegisterEvent("CHAT_MSG_ADDON");
 f:RegisterEvent("GUILD_ROSTER_UPDATE");
+f:RegisterEvent("PLAYER_REGEN_ENABLED");
 C_ChatInfo.RegisterAddonMessagePrefix("RATSYSTEM");
 
 f:SetScript("OnUpdate", function(self, elapsed)
@@ -523,6 +524,8 @@ f:SetScript("OnEvent", function(self, event, ...)
 		if (not RAT_SavedData.SetupCompleted and IsInGuild()) then
 			RAT:StartSetup();
 		end
+	elseif (event == "PLAYER_REGEN_ENABLED") then
+		RAT:FlushSyncQueue();
 	elseif (event == "CHAT_MSG_RAID" or event == "CHAT_MSG_RAID_LEADER") then
 		local message, sender = ...;
 		message = string.lower(message);

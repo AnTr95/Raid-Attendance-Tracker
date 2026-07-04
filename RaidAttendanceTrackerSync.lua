@@ -4,6 +4,34 @@ local L = RAT_Locals;
 
 local GetServerTime = GetServerTime;
 
+function RAT:SendSyncAddonMessage(prefix, msg, channel, target)
+	if InCombatLockdown() then
+		self.SyncQueue = self.SyncQueue or {};
+		self.SyncQueue[#self.SyncQueue + 1] = { prefix, msg, channel, target };
+		self:SendDebugMessage("Queued sync addon message while in combat: " .. tostring(msg));
+		return false;
+	end
+
+	C_ChatInfo.SendAddonMessage(prefix, msg, channel, target);
+	return true;
+end
+
+function RAT:FlushSyncQueue()
+	if InCombatLockdown() then
+		return;
+	end
+
+	if not self.SyncQueue or #self.SyncQueue == 0 then
+		return;
+	end
+
+	for _, payload in ipairs(self.SyncQueue) do
+		C_ChatInfo.SendAddonMessage(payload[1], payload[2], payload[3], payload[4]);
+	end
+
+	self.SyncQueue = {};
+end
+
 -----------------------
 -- Master Detection  --
 -----------------------
@@ -208,7 +236,7 @@ function RAT:BroadcastFullSync()
 	for chunkNum, chunkData in ipairs(chunks) do
 		local batchLabel = chunkNum .. "of" .. totalChunks;
 		local msg = "FULLSYNC|" .. batchLabel .. "|" .. chunkData;
-		C_ChatInfo.SendAddonMessage("RATSYSTEM", msg, "GUILD");
+		RAT:SendSyncAddonMessage("RATSYSTEM", msg, "GUILD");
 
 		-- Rate limit messages
 		if chunkNum < totalChunks then
@@ -237,7 +265,7 @@ function RAT:BroadcastUpdate(playerName, changes)
 		(changes.Rank or playerData.Rank) .. ":" ..
 		RAT:Round(changes.Score or playerData.Score);
 
-	C_ChatInfo.SendAddonMessage("RATSYSTEM", msg, "GUILD");
+	RAT:SendSyncAddonMessage("RATSYSTEM", msg, "GUILD");
 end
 
 ------------------------
