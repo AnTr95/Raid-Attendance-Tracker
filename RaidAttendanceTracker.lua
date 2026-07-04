@@ -32,6 +32,25 @@ escapeCodes.FAIL = "|cFFFF0000";
 escapeCodes.DEBUG = "|cFF43ABC9";
 escapeCodes.WARNING = "|cFFFFFF00";
 
+function RAT:IsSyncComplete()
+	return synced;
+end
+
+function RAT:QueueAttendanceInitialization()
+	pendingAttendanceInit = true;
+end
+
+function RAT:ProcessPendingAttendanceInitialization()
+	if (not pendingAttendanceInit) then
+		return false;
+	end
+	if (not self:IsSyncComplete()) then
+		return false;
+	end
+	pendingAttendanceInit = false;
+	self:InitEligibleGuildMembers();
+	return true;
+end
 
 ---------------------
 -- Caching globals --
@@ -404,6 +423,7 @@ f:SetScript("OnUpdate", function(self, elapsed)
 		synced = true;
 		C_GuildInfo.GuildRoster();
 		RAT:BroadcastFullSync();
+		RAT:ProcessPendingAttendanceInitialization();
 		--RAT:CleanAltDb();
 	end
 	local time = GetServerTime();
@@ -510,7 +530,7 @@ f:SetScript("OnEvent", function(self, event, ...)
 			end);
 		end
 		if (IsInGuild()) then
-			pendingAttendanceInit = true;
+			RAT:QueueAttendanceInitialization();
 			C_GuildInfo.GuildRoster();
 		end
 		if (not C_GuildInfo.CanEditOfficerNote()) then
@@ -522,7 +542,18 @@ f:SetScript("OnEvent", function(self, event, ...)
 			end
 		end);
 		if (not RAT_SavedData.SetupCompleted and IsInGuild()) then
-			RAT:StartSetup();
+			C_Timer.After(0, function()
+				if (RAT:IsSyncComplete()) then
+					RAT:StartSetup();
+				else
+					C_Timer.NewTicker(0.5, function(t)
+						if (RAT:IsSyncComplete()) then
+							RAT:StartSetup();
+							t:Cancel();
+						end
+					end);
+				end
+			end);
 		end
 	elseif (event == "PLAYER_REGEN_ENABLED") then
 		RAT:FlushSyncQueue();
@@ -706,10 +737,7 @@ f:SetScript("OnEvent", function(self, event, ...)
 			awaitingSync = false;
 			RAT:BroadcastFullSync();
 		end
-		if (pendingAttendanceInit) then
-			pendingAttendanceInit = false;
-			RAT:InitEligibleGuildMembers();
-		end
+		RAT:ProcessPendingAttendanceInitialization();
 		--RAT:CleanAltDb();
 	end
 end);

@@ -352,7 +352,7 @@ StaticPopupDialogs["RAT_DELETE_BUTTON"] = {
 		RAT_SavedData.Ranks = {};
 		for i = 1, GetNumGuildMembers() do
 			local isEligible = RAT:Eligible(i);
-			local name = Ambiguate(GetGuildRosterInfo(i), "none");
+			local name = RAT:NormalizePlayerName(GetGuildRosterInfo(i));
 			local hasMain = RAT:GetMain(name);
 			if (isEligible or hasMain) then
 				if (isEligible and not hasMain) then

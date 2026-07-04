@@ -40,12 +40,22 @@ end
 
 function RAT:InitEligibleGuildMembers()
 	if (not IsInGuild()) then return; end
+	if (not RAT:IsSyncComplete()) then
+		RAT:SendDebugMessage("Deferring attendance initialization until initial sync completes");
+		return;
+	end
+
+	local guildMemberCount = GetNumGuildMembers();
+	if (guildMemberCount == 0) then
+		RAT:SendDebugMessage("Skipping attendance initialization because guild roster is not available yet");
+		return;
+	end
 
 	local currentGuildMembers = {};
-	for i = 1, GetNumGuildMembers() do
+	for i = 1, guildMemberCount do
 		local fullName = select(1, GetGuildRosterInfo(i));
 		if (type(fullName) == "string" and fullName ~= "") then
-			local playerName = Ambiguate(fullName, "none");
+			local playerName = RAT:NormalizePlayerName(fullName);
 			if (playerName and playerName ~= "") then
 				currentGuildMembers[playerName] = true;
 				if (not RAT:ContainsKey(RAT_SavedData.Attendance, playerName)) then
@@ -59,8 +69,8 @@ function RAT:InitEligibleGuildMembers()
 
 	for playerName, data in pairs(RAT_SavedData.Attendance or {}) do
 		local index = RAT:GetGuildMemberIndex(playerName);
-		local shouldKeep = currentGuildMembers[playerName] and (index ~= -1) and (RAT:Eligible(index) or RAT:GetMain(playerName));
-		if (not shouldKeep) then
+		local shouldKeep = currentGuildMembers[playerName] and (index ~= -1);
+		if (not shouldKeep and currentGuildMembers[playerName] ~= nil) then
 			RAT_SavedData.Attendance[playerName] = nil;
 			RAT_SavedData.Summary[playerName] = nil;
 		end
@@ -88,6 +98,7 @@ local function addRankEntry(playerName)
 end
 
 function RAT:InitPlayer(playerName)
+	playerName = RAT:NormalizePlayerName(playerName);
 	local index = RAT:GetGuildMemberIndex(playerName);
 	if (index ~= -1) then
 		if (RAT:Eligible(index) or RAT:GetMain(playerName)) then

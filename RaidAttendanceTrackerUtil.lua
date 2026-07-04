@@ -220,6 +220,24 @@ function RAT:Round(x)
 	return x+0.5-(x+0.5)%1;
 end
 
+function RAT:NormalizePlayerName(name)
+	if (type(name) ~= "string" or name == "") then
+		return name;
+	end
+
+	local normalized = Ambiguate(name, "none");
+	if (type(normalized) ~= "string" or normalized == "") then
+		return name;
+	end
+
+	local first, second = normalized:match("^(.-)%-(.-)%-.+$");
+	if (first and second and first ~= "" and second ~= "") then
+		return first .. "-" .. second;
+	end
+
+	return normalized;
+end
+
 --[[
 	Checking if a table contains a given value and if it does, what index is the value located at
 	param(arr) table
@@ -257,11 +275,11 @@ function RAT:GetGuildMemberIndex(name)
 	if (type(name) ~= "string" or name == "") then
 		return -1;
 	end
-	name = Ambiguate(name, "none");
+	name = RAT:NormalizePlayerName(name);
 	for i = 1, GetNumGuildMembers() do
 		local fullName = select(1, GetGuildRosterInfo(i));
 		if (type(fullName) == "string" and fullName ~= "") then
-			fullName = Ambiguate(fullName, "none");
+			fullName = RAT:NormalizePlayerName(fullName);
 			if (name == fullName) then
 				return i;
 			end
@@ -282,6 +300,7 @@ function RAT:InitGuildMemberIndexes()
 end
 
 function RAT:GetGuildMemberIndexLookup(name)
+	name = RAT:NormalizePlayerName(name);
 	if (guildMemberIndexes[name]) then
 		return guildMemberIndexes[name];
 	end

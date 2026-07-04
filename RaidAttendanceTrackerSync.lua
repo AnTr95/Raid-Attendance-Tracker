@@ -227,6 +227,10 @@ function RAT:BroadcastFullSync()
 	-- Master broadcasts full attendance data to guild
 	if not RAT:IsMaster() then return; end
 	if not IsInGuild() then return; end
+	if not RAT_SavedData.Attendance or RAT:GetSize(RAT_SavedData.Attendance) == 0 then
+		RAT:SendDebugMessage("Skipping full sync broadcast because attendance data is empty");
+		return;
+	end
 
 	local dataString = RAT:SerializeAttendanceData();
 	local chunks = RAT:ChunkData(dataString, 240); -- Leave room for prefix
@@ -253,6 +257,7 @@ function RAT:BroadcastUpdate(playerName, changes)
 	if not C_GuildInfo.CanEditOfficerNote() then return; end
 
 	local timestamp = GetServerTime();
+	playerName = RAT:NormalizePlayerName(playerName);
 	local playerData = RAT_SavedData.Attendance[playerName];
 
 	if not playerData then return; end
@@ -303,8 +308,21 @@ function RAT:ReceiveFullSync(batchLabel, dataChunk, senderName)
 
 		-- Deserialize and apply
 		local newData = RAT:DeserializeAttendanceData(fullData);
+		if not newData or RAT:GetSize(newData) == 0 then
+			RAT:SendDebugMessage("Ignoring empty full sync from " .. senderName);
+			return;
+		end
+
 		for playerName, playerData in pairs(newData) do
-			RAT_SavedData.Attendance[playerName] = playerData;
+			playerName = RAT:NormalizePlayerName(playerName);
+			local existingData = RAT_SavedData.Attendance[playerName];
+			local incomingModified = tonumber(playerData.LastModified or 0);
+			local existingModified = tonumber(existingData and existingData.LastModified or 0);
+			if existingData and existingModified and incomingModified and incomingModified < existingModified then
+				RAT:SendDebugMessage("Keeping existing attendance for " .. playerName .. " because incoming sync is older");
+			else
+				RAT_SavedData.Attendance[playerName] = playerData;
+			end
 		end
 
 		-- Clear buffer
@@ -320,7 +338,7 @@ function RAT:ReceiveUpdate(timestamp, updateData, senderName, senderCanEditOffic
 
 	if #parts < 7 then return; end
 
-	local playerName = parts[1];
+	local playerName = RAT:NormalizePlayerName(parts[1]);
 	local newData = {
 		Attended = tonumber(parts[2]) or 0,
 		Absent = tonumber(parts[3]) or 0,
