@@ -119,32 +119,9 @@ function RAT:Contains(arr, value)
 	return false;
 end
 
-function RAT:AntiCheat()
-	for pl, data in pairs(RAT_SavedData.Attendance) do
-		local index = RAT:GetGuildMemberIndex(pl);
-		local pNote = select(7, GetGuildRosterInfo(index));
-		local oNote = "";
-		if (RAT:GetMain(pl)) then
-			local main = RAT:GetMain(pl);
-			local mainIndex = RAT:GetGuildMemberIndex(main);
-			oNote = select(8, GetGuildRosterInfo(mainIndex));
-		else
-			oNote = select(8, GetGuildRosterInfo(index));
-		end
-		if (oNote ~= pNote) then
-			if (not RAT:Contains(PAU, pl)) then
-				table.insert(PAU, pl);
-				GuildRosterSetPublicNote(index, oNote);
-				DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. L.ERROR_CHEAT_DETECTED1 .. pl .. L.ERROR_CHEAT_DETECTED2 .. oNote .. L.ERROR_CHEAT_DETECTED3 .. pNote .. L.DOT);
-			end
-		else
-			if (RAT:Contains(PAU, pl)) then
-				PAU[RAT:Contains(PAU, pl)] = nil;
-			end
-		end
-	end
-	--UpdateAllAlts()?
-end
+-- RAT:AntiCheat() removed: guild notes (public and officer) are no longer
+-- readable or writable in WoW 12.0. Data integrity is maintained through
+-- the timestamp-validated addon message sync system instead.
 
 function RAT:Eligible(playerIndex)
 	if (IsInGuild() and playerIndex ~= -1) then
@@ -363,11 +340,30 @@ function RAT:ToString(arr)
 	strings[#strings+1] = sb;
 	return strings;
 end
+
 --[[
 	Splits the given keyword on each whitespace and stores it in a table
 ]]
-function RAT:Split(keyword)
+function RAT:Split(keyword, delimiter)
 	local words = {};
+	if (type(keyword) ~= "string" or keyword == "") then
+		return words;
+	end
+
+	if (delimiter and delimiter ~= "") then
+		local start = 1;
+		while true do
+			local pos = string.find(keyword, delimiter, start, true);
+			if not pos then
+				words[#words + 1] = string.sub(keyword, start);
+				break;
+			end
+			words[#words + 1] = string.sub(keyword, start, pos - 1);
+			start = pos + string.len(delimiter);
+		end
+		return words;
+	end
+
 	local count = 1;
 	for word in keyword:gmatch("%S+") do
 		words[count] = word;
@@ -487,22 +483,13 @@ function RAT:InsertionSort()
 		RAT_SavedData.Ranks[i+1] = current;
 	end
 end
---[[
 function RAT:GetMain(alt)
-	for main, data in pairs(RAT_SavedData.AltDb) do
-		local alts = data.Alts;
-		if (RAT:Contains(alts, alt)) then
-			return main;
-		end
-	end
-	return false;
-end]]
-function RAT:GetMain(alt)
-	local index = RAT:GetGuildMemberIndex(alt);
-	local note = select(8, GetGuildRosterInfo(index));
-	local mainIndex = RAT:GetGuildMemberIndex(note);
-	if (mainIndex ~= -1 and RAT:Eligible(mainIndex)) then
-		return note;
+	-- Reads from AltDb flat structure {[altName]={Main="mainName",Timestamp=serverTime}}
+	-- Officer notes are no longer readable/writable in WoW 12.0.
+	if (not alt or type(alt) ~= "string" or alt == "") then return false; end
+	local entry = RAT_SavedData.AltDb and RAT_SavedData.AltDb[alt];
+	if (entry and type(entry) == "table" and entry.Main) then
+		return entry.Main;
 	end
 	return false;
 end
@@ -550,28 +537,14 @@ function RAT:UpdateAllAlts()
 end]]
 
 function RAT:UpdateAllAlts()
-	for index = 1, GetNumGuildMembers() do
-		local name = Ambiguate(select(1, GetGuildRosterInfo(index)), "none");
-		local main = RAT:GetMain(name);
-		if (main) then
-			local mainIndex = RAT:GetGuildMemberIndex(main);
-			local mainNote = select(8, GetGuildRosterInfo(mainIndex));
-			GuildRosterSetPublicNote(index, mainNote);
-		end
-	end
+	-- DEPRECATED: public notes are no longer writable in WoW 12.0.
+	-- Alt data is now propagated via the FULLSYNC/ALT addon message system.
 end
 
 
 function RAT:UpdatePlayerAlts(main)
-	for index = 1, GetNumGuildMembers() do
-		local name = GetGuildRosterInfo(index);
-		local itMain = RAT:GetMain(name);
-		if (itMain == main) then
-			local mainIndex = RAT:GetGuildMemberIndex(main);
-			local mainNote = select(8, GetGuildRosterInfo(mainIndex));
-			GuildRosterSetPublicNote(index, mainNote);
-		end
-	end
+	-- DEPRECATED: public notes are no longer writable in WoW 12.0.
+	-- Alt data is now propagated via the FULLSYNC/ALT addon message system.
 end
 
 --[[

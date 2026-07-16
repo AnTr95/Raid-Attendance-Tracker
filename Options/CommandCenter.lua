@@ -127,25 +127,27 @@ actionButton:SetScript("OnClick", function(self)
 			for k, pl in pairs(selectedPlayers) do
 				RAT_SavedData.Bench[RAT:GetSize(RAT_SavedData.Bench)+1] = pl;
 				local msg = "BENCH " .. pl;
-				C_ChatInfo.SendAddonMessage("RATSYSTEM", msg, "GUILD");
-				C_ChatInfo.SendChatMessage(L.ADDON .. pl .. L.BROADCAST_BENCHED_PLAYER, "GUILD");
+				RAT:SendSyncAddonMessage("RATSYSTEM", msg, "GUILD");
+				if (C_GuildInfo.CanEditOfficerNote()) then
+					C_ChatInfo.SendChatMessage(L.ADDON .. pl .. L.BROADCAST_BENCHED_PLAYER, "GUILD");
+				end
 			end
 		elseif (selectedAction == "Award") then
 			if (amount ~= 0) then
 				for k, pl in pairs(selectedPlayers) do
 					RAT:PlayerAttended(pl, amount);
 					C_Timer.After(2, function() RAT:UpdatePlayerAlts(pl); end);
+					RAT:BroadcastOperation("AWARD", RAT:NormalizePlayerName(pl) .. ":" .. tostring(amount));
 				end
-				if (#selectedPlayers > 1) then
+				if (C_GuildInfo.CanEditOfficerNote() and #selectedPlayers > 1) then
 					local strings = RAT:ToString(selectedPlayers);
 					C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_AWARDED_ALL1 .. amount .. L.BROADCAST_AWARDED_ALL2 .. strings[1], "GUILD");
 					for i = 2, #strings do
 						C_ChatInfo.SendChatMessage(strings[i], "GUILD");
 					end
-				else
+				elseif (C_GuildInfo.CanEditOfficerNote()) then
 					C_ChatInfo.SendChatMessage(L.ADDON .. selectedPlayers[1] .. L.BROADCAST_AWARDED_PLAYER1 .. amount .. L.BROADCAST_AWARDED_PLAYER2, "GUILD");
 				end
-				C_ChatInfo.SendAddonMessage("RATSYSTEM", "SYNCATTENDANCE", "GUILD");
 				RAT:SetLastAttending(selectedPlayers);
 				RAT:SetLastAbsent({});
 				RAT:SetLastAmount(amount);
@@ -155,17 +157,17 @@ actionButton:SetScript("OnClick", function(self)
 				for k, pl in pairs(selectedPlayers) do
 					RAT:PlayerAbsent(pl, amount);
 					C_Timer.After(2, function() RAT:UpdatePlayerAlts(pl); end);
+					RAT:BroadcastOperation("ABSENT", RAT:NormalizePlayerName(pl) .. ":" .. tostring(amount));
 				end
-				if (#selectedPlayers > 1) then
+				if (C_GuildInfo.CanEditOfficerNote() and #selectedPlayers > 1) then
 					local strings = RAT:ToString(selectedPlayers);
 					C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_CC_ABSENT_PLAYER1 .. amount .. L.BROADCAST_CC_ABSENT_PLAYER2 .. strings[1], "GUILD");
 					for i = 2, #strings do
 						C_ChatInfo.SendChatMessage(strings[i], "GUILD");
 					end
-				else
+				elseif (C_GuildInfo.CanEditOfficerNote()) then
 					C_ChatInfo.SendChatMessage(L.ADDON .. selectedPlayers[1] .. L.BROADCAST_ABSENT_PLAYER1 .. amount .. L.BROADCAST_ABSENT_PLAYER2, "GUILD");
 				end
-				C_ChatInfo.SendAddonMessage("RATSYSTEM", "SYNCATTENDANCE", "GUILD");
 				RAT:SetLastAttending({});
 				RAT:SetLastAbsent(selectedPlayers);
 				RAT:SetLastAmount(amount);
@@ -175,9 +177,11 @@ actionButton:SetScript("OnClick", function(self)
 				for k, pl in pairs(selectedPlayers) do
 					RAT:StrikePlayer(pl, amount);
 					C_Timer.After(2, function() RAT:UpdatePlayerAlts(pl); end);
-					C_ChatInfo.SendChatMessage(L.ADDON .. pl .. L.BROADCAST_STRIKE_PLAYER1 .. amount .. L.BROADCAST_STRIKE_PLAYER2, "GUILD");
+					RAT:BroadcastOperation("STRIKE", RAT:NormalizePlayerName(pl) .. ":" .. tostring(amount));
+					if (C_GuildInfo.CanEditOfficerNote()) then
+						C_ChatInfo.SendChatMessage(L.ADDON .. pl .. L.BROADCAST_STRIKE_PLAYER1 .. amount .. L.BROADCAST_STRIKE_PLAYER2, "GUILD");
+					end
 				end
-				C_ChatInfo.SendAddonMessage("RATSYSTEM", "SYNCATTENDANCE", "GUILD");
 			end
 		end
 	end
@@ -350,23 +354,12 @@ StaticPopupDialogs["RAT_DELETE_BUTTON"] = {
 	OnAccept = function(self, data, data2)
 		RAT_SavedData.Attendance = {};
 		RAT_SavedData.Ranks = {};
+		RAT_SavedData.AltDb = {};
 		for i = 1, GetNumGuildMembers() do
 			local isEligible = RAT:Eligible(i);
 			local name = RAT:NormalizePlayerName(GetGuildRosterInfo(i));
-			local hasMain = RAT:GetMain(name);
-			if (isEligible or hasMain) then
-				if (isEligible and not hasMain) then
-					RAT:InitPlayer(name);
-					RAT:UpdateNote(name, i);
-				elseif (hasMain) then
-					GuildRosterSetPublicNote(i, "R:99 AP:0 0% M:0 S:0/3");
-				end
-			else
-				local note = select(8, GetGuildRosterInfo(i));
-				if (note:find("R:") and note:find("AP:") and note:find("M:") and note:find("S:") and note:find("%%")) then
-					GuildRosterSetOfficerNote(i, "");
-					GuildRosterSetPublicNote(i, "");
-				end
+			if (isEligible) then
+				RAT:InitPlayer(name);
 			end
 		end
 		RAT:InitEligibleGuildMembers();

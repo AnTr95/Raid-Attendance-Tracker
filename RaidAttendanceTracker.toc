@@ -1,6 +1,6 @@
 ## Interface: 120007
 ## Title: Raid Attendance Tracker
-## Version: 4.1a
+## Version: 4.2a
 ## Author: Ant-Kazzak
 ## Category: Dungeons & Raids
 ## Notes: Tracks the attendance of your raiders

@@ -181,17 +181,6 @@ function RAT:StrikePlayer(playerName, strikes)
 			RAT_SavedData.Attendance[playerName].LastModified = GetServerTime();
 			RAT:UpdateNote(playerName, index);
 			RAT:LogStrike(playerName, strikes, tostring(date()));
-			-- Broadcast the update to all players
-			if (C_GuildInfo.CanEditOfficerNote()) then
-				RAT:BroadcastUpdate(playerName, {
-					Attended = RAT_SavedData.Attendance[playerName].Attended,
-					Absent = RAT_SavedData.Attendance[playerName].Absent,
-					Percent = RAT_SavedData.Attendance[playerName].Percent,
-					Strikes = RAT_SavedData.Attendance[playerName].Strikes,
-					Rank = RAT_SavedData.Attendance[playerName].Rank,
-					Score = RAT_SavedData.Attendance[playerName].Score,
-				});
-			end
 		end
 	end
 end
@@ -214,17 +203,6 @@ function RAT:Import(playerName, attended, absent)
 			RAT_SavedData.Attendance[playerName].Score = RAT:CalculateScore(playerName);
 			RAT_SavedData.Attendance[playerName].LastModified = GetServerTime();
 			RAT:UpdateRank();
-			-- Broadcast the update to all players
-			if (C_GuildInfo.CanEditOfficerNote()) then
-				RAT:BroadcastUpdate(playerName, {
-					Attended = RAT_SavedData.Attendance[playerName].Attended,
-					Absent = RAT_SavedData.Attendance[playerName].Absent,
-					Percent = RAT_SavedData.Attendance[playerName].Percent,
-					Strikes = RAT_SavedData.Attendance[playerName].Strikes,
-					Rank = RAT_SavedData.Attendance[playerName].Rank,
-					Score = RAT_SavedData.Attendance[playerName].Score,
-				});
-			end
 		end
 	end
 end
@@ -278,7 +256,7 @@ function RAT:GetAbsentPlayers(absent)
 				end
 			end
 		end
-		if (absentPlayers ~= nil) then
+		if (absentPlayers ~= nil and not RAT:IsApplyingRemoteSyncOp() and RAT:IsMaster()) then
 			RAT:BroadcastAbsent(absentPlayers);
 		end
 		RAT:SetLastAbsent(absentPlayers);
@@ -343,13 +321,15 @@ function RAT:AllAttended(attended)
 		end
 		C_Timer.After(2, function()
 			isAwardHandOutRunning = false;
-			RAT:Broadcast(attended);
+			-- Post to guild chat from the highest ranking person who can:
+			-- the global master if present in raid, otherwise the top raid officer.
+			if (not RAT:IsApplyingRemoteSyncOp()) then
+				if (RAT:IsMaster() or RAT:IsHighestRankingRaidOfficer()) then
+					RAT:Broadcast(attended);
+				end
+			end
 			RAT:GetAbsentPlayers(attended);
 			RAT:UpdateRank();
-			-- Broadcast full sync to all players
-			if (C_GuildInfo.CanEditOfficerNote()) then
-				RAT:BroadcastFullSync();
-			end
 			RAT:SetLastAttending(attendingPlayers);
 			RAT:SetLastAmount(attended);
 		end);
@@ -372,17 +352,6 @@ function RAT:PlayerAttended(playerName, attended)
 			RAT_SavedData.Attendance[playerName].LastModified = GetServerTime();
 			RAT:UpdateNote(playerName, index);
 			RAT:LogAttended(playerName, attended, tostring(date()));
-			-- Broadcast the update to all players
-			if (C_GuildInfo.CanEditOfficerNote()) then
-				RAT:BroadcastUpdate(playerName, {
-					Attended = RAT_SavedData.Attendance[playerName].Attended,
-					Absent = RAT_SavedData.Attendance[playerName].Absent,
-					Percent = RAT_SavedData.Attendance[playerName].Percent,
-					Strikes = RAT_SavedData.Attendance[playerName].Strikes,
-					Rank = RAT_SavedData.Attendance[playerName].Rank,
-					Score = RAT_SavedData.Attendance[playerName].Score,
-				});
-			end
 		end
 	end
 end
@@ -405,17 +374,6 @@ function RAT:PlayerAbsent(playerName, absent)
 			RAT_SavedData.Attendance[playerName].LastModified = GetServerTime();
 			RAT:UpdateNote(playerName, index);
 			RAT:LogAbsent(playerName, absent, tostring(date()));
-			-- Broadcast the update to all players
-			if (C_GuildInfo.CanEditOfficerNote()) then
-				RAT:BroadcastUpdate(playerName, {
-					Attended = RAT_SavedData.Attendance[playerName].Attended,
-					Absent = RAT_SavedData.Attendance[playerName].Absent,
-					Percent = RAT_SavedData.Attendance[playerName].Percent,
-					Strikes = RAT_SavedData.Attendance[playerName].Strikes,
-					Rank = RAT_SavedData.Attendance[playerName].Rank,
-					Score = RAT_SavedData.Attendance[playerName].Score,
-				});
-			end
 		end
 	end
 end
@@ -427,11 +385,9 @@ function RAT:Undo(lastAttending, lastAbsent, lastAmount)
 		RAT:PlayerAbsent(v, -lastAmount);
 	end
 	RAT:UpdateRank();
-	-- Broadcast full sync after undo
-	if (C_GuildInfo.CanEditOfficerNote()) then
-		RAT:BroadcastFullSync();
+	if (not RAT:IsApplyingRemoteSyncOp() and C_GuildInfo.CanEditOfficerNote()) then
+		C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_UNDONE_AWARD, "GUILD");
 	end
-	C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_UNDONE_AWARD, "GUILD");
 	RAT:SetLastAmount(-lastAmount);
 	C_Timer.After(2.5, function() RAT:UpdateAllAlts(); end);
 end
