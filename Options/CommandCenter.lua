@@ -122,31 +122,31 @@ actionButton:SetSize(80,25);
 actionButton:SetPoint("BOTTOMLEFT", 470, 18);
 actionButton:SetText(L.OPTIONS_ACTION_BUTTON);
 actionButton:SetScript("OnClick", function(self)
-	if(next(selectedPlayers)) then
+	if (next(selectedPlayers)) then
 		if (selectedAction == "Bench") then
 			for k, pl in pairs(selectedPlayers) do
-				RAT_SavedData.Bench[RAT:GetSize(RAT_SavedData.Bench)+1] = pl;
-				local msg = "BENCH " .. pl;
-				RAT:SendSyncAddonMessage("RATSYSTEM", msg, "GUILD");
-				if (C_GuildInfo.CanEditOfficerNote()) then
-					C_ChatInfo.SendChatMessage(L.ADDON .. pl .. L.BROADCAST_BENCHED_PLAYER, "GUILD");
+				if (not RAT:IsBenched(pl)) then
+					RAT_SavedData.Bench[RAT:GetSize(RAT_SavedData.Bench)+1] = pl;
+					RAT:BroadcastCommand("BENCH", { pl });
+					RAT:SendGuild(L.ADDON .. pl .. L.BROADCAST_BENCHED_PLAYER);
 				end
 			end
+			RAT:Touch();
 		elseif (selectedAction == "Award") then
 			if (amount ~= 0) then
 				for k, pl in pairs(selectedPlayers) do
 					RAT:PlayerAttended(pl, amount);
-					C_Timer.After(2, function() RAT:UpdatePlayerAlts(pl); end);
-					RAT:BroadcastOperation("AWARD", RAT:NormalizePlayerName(pl) .. ":" .. tostring(amount));
+					RAT:BroadcastCommand("AWARD", { pl, amount });
 				end
-				if (C_GuildInfo.CanEditOfficerNote() and #selectedPlayers > 1) then
+				RAT:RebuildRanks();
+				if (#selectedPlayers > 1) then
 					local strings = RAT:ToString(selectedPlayers);
-					C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_AWARDED_ALL1 .. amount .. L.BROADCAST_AWARDED_ALL2 .. strings[1], "GUILD");
+					RAT:SendGuild(L.ADDON .. L.BROADCAST_AWARDED_ALL1 .. amount .. L.BROADCAST_AWARDED_ALL2 .. strings[1]);
 					for i = 2, #strings do
-						C_ChatInfo.SendChatMessage(strings[i], "GUILD");
+						RAT:SendGuild(strings[i]);
 					end
-				elseif (C_GuildInfo.CanEditOfficerNote()) then
-					C_ChatInfo.SendChatMessage(L.ADDON .. selectedPlayers[1] .. L.BROADCAST_AWARDED_PLAYER1 .. amount .. L.BROADCAST_AWARDED_PLAYER2, "GUILD");
+				else
+					RAT:SendGuild(L.ADDON .. selectedPlayers[1] .. L.BROADCAST_AWARDED_PLAYER1 .. amount .. L.BROADCAST_AWARDED_PLAYER2);
 				end
 				RAT:SetLastAttending(selectedPlayers);
 				RAT:SetLastAbsent({});
@@ -156,17 +156,17 @@ actionButton:SetScript("OnClick", function(self)
 			if (amount ~= 0) then
 				for k, pl in pairs(selectedPlayers) do
 					RAT:PlayerAbsent(pl, amount);
-					C_Timer.After(2, function() RAT:UpdatePlayerAlts(pl); end);
-					RAT:BroadcastOperation("ABSENT", RAT:NormalizePlayerName(pl) .. ":" .. tostring(amount));
+					RAT:BroadcastCommand("ABSENT", { pl, amount });
 				end
-				if (C_GuildInfo.CanEditOfficerNote() and #selectedPlayers > 1) then
+				RAT:RebuildRanks();
+				if (#selectedPlayers > 1) then
 					local strings = RAT:ToString(selectedPlayers);
-					C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_CC_ABSENT_PLAYER1 .. amount .. L.BROADCAST_CC_ABSENT_PLAYER2 .. strings[1], "GUILD");
+					RAT:SendGuild(L.ADDON .. L.BROADCAST_CC_ABSENT_PLAYER1 .. amount .. L.BROADCAST_CC_ABSENT_PLAYER2 .. strings[1]);
 					for i = 2, #strings do
-						C_ChatInfo.SendChatMessage(strings[i], "GUILD");
+						RAT:SendGuild(strings[i]);
 					end
-				elseif (C_GuildInfo.CanEditOfficerNote()) then
-					C_ChatInfo.SendChatMessage(L.ADDON .. selectedPlayers[1] .. L.BROADCAST_ABSENT_PLAYER1 .. amount .. L.BROADCAST_ABSENT_PLAYER2, "GUILD");
+				else
+					RAT:SendGuild(L.ADDON .. selectedPlayers[1] .. L.BROADCAST_ABSENT_PLAYER1 .. amount .. L.BROADCAST_ABSENT_PLAYER2);
 				end
 				RAT:SetLastAttending({});
 				RAT:SetLastAbsent(selectedPlayers);
@@ -176,12 +176,10 @@ actionButton:SetScript("OnClick", function(self)
 			if (amount ~= 0) then
 				for k, pl in pairs(selectedPlayers) do
 					RAT:StrikePlayer(pl, amount);
-					C_Timer.After(2, function() RAT:UpdatePlayerAlts(pl); end);
-					RAT:BroadcastOperation("STRIKE", RAT:NormalizePlayerName(pl) .. ":" .. tostring(amount));
-					if (C_GuildInfo.CanEditOfficerNote()) then
-						C_ChatInfo.SendChatMessage(L.ADDON .. pl .. L.BROADCAST_STRIKE_PLAYER1 .. amount .. L.BROADCAST_STRIKE_PLAYER2, "GUILD");
-					end
+					RAT:BroadcastCommand("STRIKE", { pl, amount });
+					RAT:SendGuild(L.ADDON .. pl .. L.BROADCAST_STRIKE_PLAYER1 .. amount .. L.BROADCAST_STRIKE_PLAYER2);
 				end
+				RAT:RebuildRanks();
 			end
 		end
 	end
@@ -333,7 +331,8 @@ StaticPopupDialogs["RAT_AWARD_ALL_BUTTON"] = {
 	OnAccept = function(self, data, data2)
 		local input = self.editBox:GetText();
 		if (tonumber(input)) then
-			RAT:AllAttended(tonumber(input));
+			RAT:AllAttended(tonumber(input), true);
+			RAT:BroadcastCommand("AWARDALL", { tonumber(input) });
 		end
 	end,
 	timeout = 0,
@@ -349,21 +348,17 @@ StaticPopupDialogs["RAT_DELETE_BUTTON"] = {
 	hasEditBox = true,
 	showAlert = true,
 	OnShow = function(self, data)
-		self.ButtonContainer.Button1:Disable();
+		self:GetParent().ButtonContainer.Button1:Enable();
 	end,
 	OnAccept = function(self, data, data2)
 		RAT_SavedData.Attendance = {};
 		RAT_SavedData.Ranks = {};
-		RAT_SavedData.AltDb = {};
-		for i = 1, GetNumGuildMembers() do
-			local isEligible = RAT:Eligible(i);
-			local name = RAT:NormalizePlayerName(GetGuildRosterInfo(i));
-			if (isEligible) then
-				RAT:InitPlayer(name);
-			end
-		end
-		RAT:InitEligibleGuildMembers();
-		C_ChatInfo.SendChatMessage(L.ADDON .. Ambiguate(UnitName("player"), "none") .. L.SYSTEM_DELETED_DATA, "GUILD");
+		RAT_SavedData.Bench = {};
+		RAT_SavedData.Summary = {};
+		RAT:ReconcileRoster();
+		RAT:Touch();
+		RAT:SendGuild(L.ADDON .. RAT:CleanName(UnitName("player")) .. L.SYSTEM_DELETED_DATA);
+		RAT:BroadcastCommand("DELETEALL", {});
 	end,
 	EditBoxOnTextChanged = function(self, data)
 		local input = self:GetText();

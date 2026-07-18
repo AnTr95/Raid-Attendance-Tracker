@@ -29,7 +29,9 @@
         "Settings",
         "SettingsPanel",
         "GetUnitName",
-        "RAID_CLASS_COLORS"
+        "RAID_CLASS_COLORS",
+        "UISpecialFrames",
+        "CLOSE"
     ],
     "Lua.runtime.version": "Lua 5.1",
     "Lua.runtime.builtin": {

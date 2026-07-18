@@ -4,6 +4,7 @@ local L = RAT_Locals;
 local page = 1;
 local rtFrames = nil;
 local rrFrames = nil;
+local orFrames = nil;
 local weekdaysNames = {[1] = "Sunday", [2] = "Monday", [3] = "Tuesday", [4] = "Wednesday", [5] = "Thursday", [6] = "Friday", [7] = "Saturday"};
 
 local function findTwoLetterMatches(arr, value)
@@ -206,10 +207,6 @@ function RAT:SuggestRaidDays()
 	end
 	--Scan guild info for general raid times
 	if (not raidTimesFound) then
-		local startHour = nil;
-		local startMinute = nil;
-		local finishHour = nil;
-		local finishMinute = nil;
 		for i, word in pairs(gInfoWords) do
 			if (word:match("[%d%.%-:]+")) then --Only match numbers, ., - and :
 				local times = {};
@@ -558,6 +555,23 @@ scanRRButton:SetScript("OnClick", function(self)
 	self:Hide();
 end);
 scanRRButton:Hide();
+
+local scanORButton = CreateFrame("Button", "RAT_ScanORButton", setupFrame, "UIMenuButtonStretchTemplate");
+scanORButton:SetSize(130, 50);
+scanORButton:SetPoint("TOPLEFT", 50, -350);
+scanORButton:SetText(L.OPTIONS_SCAN_RR_BUTTON);
+scanORButton:SetScript("OnClick", function(self)
+	RAT_SavedOptions.OfficerRanks = {};
+	local ranks = RAT:GetAllGuildRanks();
+	for index, rank in pairs(ranks) do
+		if (rank == "Guild Master" or rank == "Officer") then
+			table.insert(RAT_SavedOptions.OfficerRanks, rank);
+			_G["RAT_OR_Checkbox_" .. rank]:SetChecked(true);
+		end
+	end
+	self:Hide();
+end);
+scanORButton:Hide();
 
 local sortRankText = setupFrame:CreateFontString(nil, "ARTWORK", "GameFontWhite");
 sortRankText:SetText(L.OPTIONS_SORT_RANK_TEXT);
@@ -976,6 +990,57 @@ local function hideRRFrames()
 	end
 end
 
+local function initORFrames()
+	if (not orFrames) then
+		orFrames = {};
+		local ranks = RAT:GetAllGuildRanks();
+		for i = 1, #ranks do
+			local text = setupFrame:CreateFontString("RAT_OR_Text_" .. ranks[i], "ARTWORK", "GameFontWhite");
+			text:SetText(ranks[i]);
+			text:SetPoint("TOPLEFT", 60+((i+1)%2*150), -195-(math.floor((i-1)/2))*25);
+			text:Hide();
+			table.insert(orFrames, text);
+		end
+		for i = 1, #ranks do
+			local checkButton = CreateFrame("CheckButton", "RAT_OR_Checkbox_" .. ranks[i], setupFrame, "UICheckButtonTemplate");
+			checkButton:SetSize(20, 20);
+			checkButton:SetPoint("TOPLEFT", 150+((i+1)%2*150), -195-(math.floor((i-1)/2))*25);
+			checkButton:SetScript("OnClick", function(self)
+				local checked = self:GetChecked();
+				local exists = RAT:Contains(RAT_SavedOptions.OfficerRanks, ranks[i]);
+				if (checked and not exists) then
+					table.insert(RAT_SavedOptions.OfficerRanks, ranks[i]);
+				elseif (not checked and exists) then
+					table.remove(RAT_SavedOptions.OfficerRanks, exists);
+				end
+			end);
+			checkButton:Hide();
+			table.insert(orFrames, checkButton);
+		end
+	end
+end
+
+local function showORFrames()
+	if (not orFrames) then
+		initORFrames();
+	end
+	for index, frame in pairs(orFrames) do
+		frame:Show();
+		local frameName = frame:GetName();
+		if (frameName and string.find(frameName, "RAT_OR_Checkbox_")) then
+			frame:SetChecked(RAT:Contains(RAT_SavedOptions.OfficerRanks, string.sub(frameName, 17)) ~= false);
+		end
+	end
+end
+
+local function hideORFrames()
+	if (orFrames) then
+		for index, frame in pairs(orFrames) do
+			frame:Hide();
+		end
+	end
+end
+
 local function hideAll()
 	setupText:Hide();
 	startText:Hide();
@@ -984,8 +1049,10 @@ local function hideAll()
 	scanRTButton:Hide();
 	hideRTFrames();
 	hideRRFrames();
+	hideORFrames();
 	infoText:Hide();
 	scanRRButton:Hide();
+	scanORButton:Hide();
 	rankText:Hide();
 	awardStartText:Hide();
 	awardStartHelp:Hide();
@@ -1050,6 +1117,15 @@ function RAT:OpenSetupPage(page)
 			rightButton:Disable();
 		end
 	elseif (page == 4) then
+		initORFrames();
+		title:SetText(L.OPTIONS_OFFICER_RANKS_TITLE);
+		infoText:SetText(L.SETUP_OR_INFO_TEXT);
+		infoText:Show();
+		rankText:Show();
+		scanORButton:Show();
+		showORFrames();
+		rightButton:Enable();
+	elseif (page == 5) then
 		title:SetText(L.OPTIONS_SETTINGS_TITLE);
 		infoText:SetText(L.SETUP_SETTINGS_INFO_TEXT);
 		infoText:Show();
@@ -1069,24 +1145,20 @@ function RAT:OpenSetupPage(page)
 		sortRankMenu:SetDefaultText(RAT_SavedOptions.RankingAlgo);
 		awardStartCheckButton:SetChecked(RAT_SavedOptions.AwardStart);
 		punishCalendarCheckButton:SetChecked(RAT_SavedOptions.PunishCalendar);
-		--minimapModeText:Show();
-		--minimapStateMenu:Show();
-		--Initialize_MinimapState();
-		--UIDropDownMenu_SetSelectedName(minimapStateMenu, RAT_SavedOptions.MinimapMode);
-	elseif (page == 5) then
+	elseif (page == 6) then
 		rightButton:SetText(L.OPTIONS_RIGHT_BUTTON);
 		title:SetText(L.OPTIONS_SETUP_COMPLETED_TITLE);
 		infoText:Show();
 		infoText:SetText(L.SETUP_COMPLETED_INFO_TEXT1);
 		RAT_SavedData.SetupCompleted = true;
-	elseif (page == 6) then
+	elseif (page == 7) then
 		rightButton:SetText(L.OPTIONS_RIGHT_BUTTON_DONE);
 		title:SetText(L.OPTIONS_SETUP_COMPLETED_TITLE);
 		infoText:Show();
 		infoText:SetText(L.SETUP_COMPLETED_INFO_TEXT2);
-	elseif (page == 7) then
+	elseif (page == 8) then
 		setupFrame:Hide();
-		RAT:InitEligibleGuildMembers();
+		RAT:ReconcileRoster();
 	end
 	pageText:SetText(L.OPTIONS_PAGE_TEXT1 .. page .. L.OPTIONS_PAGE_TEXT2);
 end

@@ -19,7 +19,6 @@ local syncDelay = 10;
 local synced = false;
 local benched = {};
 local awaitingSync = false;
-local pendingAttendanceInit = false;
 local lastAttending = {};
 local lastAbsent = {};
 local lastAmount = 0;
@@ -32,25 +31,6 @@ escapeCodes.FAIL = "|cFFFF0000";
 escapeCodes.DEBUG = "|cFF43ABC9";
 escapeCodes.WARNING = "|cFFFFFF00";
 
-function RAT:IsSyncComplete()
-	return synced;
-end
-
-function RAT:QueueAttendanceInitialization()
-	pendingAttendanceInit = true;
-end
-
-function RAT:ProcessPendingAttendanceInitialization()
-	if (not pendingAttendanceInit) then
-		return false;
-	end
-	if (not self:IsSyncComplete()) then
-		return false;
-	end
-	pendingAttendanceInit = false;
-	self:InitEligibleGuildMembers();
-	return true;
-end
 
 ---------------------
 -- Caching globals --
@@ -69,95 +49,102 @@ SLASH_RAIDATTENDANCETRACKER1 = "/rat"; -- slashcommand
 --	LEADERRBOARD    --
 ----------------------
 
-local leaderBoard = CreateFrame("Frame", nil, nil, BackdropTemplateMixin and "BackdropTemplate");
-leaderBoard:SetWidth(280);
-leaderBoard:SetHeight(500);
+local leaderBoard = CreateFrame("Frame", "RAT_Leaderboard", UIParent, BackdropTemplateMixin and "BackdropTemplate");
+leaderBoard:SetSize(420, 520);
 leaderBoard:SetPoint("CENTER");
 leaderBoard:SetMovable(true);
 leaderBoard:EnableMouse(true);
 leaderBoard:RegisterForDrag("LeftButton");
-leaderBoard:SetFrameLevel(3);
+leaderBoard:SetFrameStrata("DIALOG");
+leaderBoard:SetToplevel(true);
 leaderBoard:SetScript("OnDragStart", leaderBoard.StartMoving);
 leaderBoard:SetScript("OnDragStop", leaderBoard.StopMovingOrSizing);
-leaderBoard:SetBackdrop({bgFile = "Interface/Tooltips/UI-Tooltip-Background", --Set the background and border textures
-	edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-	tile = true, tileSize = 16, edgeSize = 16,
-	insets = { left = 4, right = 4, top = 4, bottom = 4 }
+leaderBoard:SetBackdrop({
+	bgFile = "Interface/DialogFrame/UI-DialogBox-Background-Dark",
+	edgeFile = "Interface/DialogFrame/UI-DialogBox-Border",
+	tile = true, tileSize = 32, edgeSize = 32,
+	insets = { left = 11, right = 12, top = 12, bottom = 11 }
 });
-leaderBoard:SetBackdropColor(0.3,0.3,0.3,0.6);
 leaderBoard:Hide();
+tinsert(UISpecialFrames, "RAT_Leaderboard"); -- Escape closes the window
 
-local texture = leaderBoard:CreateTexture();
-texture:SetColorTexture(0.5, 0.5, 0.5, 0.5); --This needs testing
-texture:SetAllPoints();
+local lbTitle = leaderBoard:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
+lbTitle:SetPoint("TOP", 0, -18);
+lbTitle:SetText(L.ADDON_FULL);
 
-local leaderboardText = leaderBoard:CreateFontString(nil, "ARTWORK", "GameFontNormal");
-leaderboardText:ClearAllPoints();
-leaderboardText:SetPoint("TOPLEFT", 12, -12);
-leaderboardText:SetWidth(250);
-leaderboardText:SetJustifyH("LEFT");
-leaderboardText:SetJustifyV("TOP");
-leaderboardText:SetText("");
+-- Column headers (x positions match the data columns below).
+local function makeHeader(label, x)
+	local h = leaderBoard:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall");
+	h:SetPoint("TOPLEFT", x, -48);
+	h:SetText(label);
+	return h;
+end
+makeHeader("#  Name", 26);
+makeHeader("AP", 220);
+makeHeader("M", 268);
+makeHeader("%", 312);
 
+local lbDivider = leaderBoard:CreateTexture(nil, "ARTWORK");
+lbDivider:SetColorTexture(1, 1, 1, 0.18);
+lbDivider:SetPoint("TOPLEFT", 20, -62);
+lbDivider:SetPoint("TOPRIGHT", -36, -62);
+lbDivider:SetHeight(1);
+
+local lbScroll = CreateFrame("ScrollFrame", "RAT_LeaderboardScroll", leaderBoard, "UIPanelScrollFrameTemplate");
+lbScroll:SetPoint("TOPLEFT", 20, -68);
+lbScroll:SetPoint("BOTTOMRIGHT", -36, 48);
+local lbContent = CreateFrame("Frame", nil, lbScroll);
+lbContent:SetSize(340, 1);
+lbScroll:SetScrollChild(lbContent);
+
+-- Four vertically-aligned columns (same rows => rows line up across columns).
+local function makeColumn(font, x, w)
+	local fs = lbContent:CreateFontString(nil, "ARTWORK", font);
+	fs:SetPoint("TOPLEFT", x, 0);
+	fs:SetWidth(w);
+	fs:SetJustifyH("LEFT");
+	fs:SetJustifyV("TOP");
+	fs:SetSpacing(5);
+	return fs;
+end
+local lbName = makeColumn("GameFontNormal", 6, 185);   -- rank + class-coloured name
+local lbAP   = makeColumn("GameFontHighlight", 200, 44);
+local lbM    = makeColumn("GameFontHighlight", 248, 40);
+local lbPct  = makeColumn("GameFontHighlight", 292, 48);
 
 local closeButton = CreateFrame("Button", "RAT_closeButton", leaderBoard, "UIPanelButtonTemplate");
-closeButton:SetSize(220, 25);
-closeButton:SetPoint("BOTTOM", 0, 10);
-closeButton:SetText("OK");
-closeButton:HookScript("OnClick", function(frame)
+closeButton:SetSize(120, 24);
+closeButton:SetPoint("BOTTOM", 0, 16);
+closeButton:SetText(CLOSE or "Close");
+closeButton:HookScript("OnClick", function()
 	leaderBoard:Hide();
 end);
 
-local function getLeaderboardDisplayName(playerName)
-	if (type(playerName) ~= "string" or playerName == "") then
-		return "";
-	end
-	local displayName = Ambiguate(playerName, "short");
-	if (displayName and displayName ~= "" and displayName ~= playerName) then
-		return displayName;
-	end
-	local simplifiedName = playerName:match("^(.-)%-.+$") or playerName;
-	if (simplifiedName and simplifiedName ~= "") then
-		return simplifiedName;
-	end
-	return playerName;
-end
-
-local function getLeaderboardColor(playerName)
-	local index = RAT:GetGuildMemberIndex(playerName);
-	if (index and index ~= -1) then
-		local _, _, _, _, _, _, _, _, _, _, classFileName = GetGuildRosterInfo(index);
-		local classColors = rawget(_G, "CUSTOM_CLASS_COLORS") or rawget(_G, "RAID_CLASS_COLORS");
-		if (classFileName and classColors and classColors[classFileName]) then
-			local color = classColors[classFileName];
-			return string.format("|cFF%02X%02X%02X", color.r * 255, color.g * 255, color.b * 255);
-		end
-	end
-	return "|cFFFFFFFF";
-end
-
 local function updateLeaderboard()
-	local text = "";
-	if (not RAT_SavedData.Ranks) then
-		leaderboardText:SetText("");
-		return;
-	end
-
+	local names, aps, ms, pcts = "", "", "", "";
 	for k, v in pairs(RAT_SavedData.Ranks) do
 		if (not RAT:GetMain(v)) then
-			local playerData = RAT_SavedData.Attendance[v];
-			if (playerData) then
-				local plRank = playerData.Rank or k;
-				local attended = tonumber(playerData.Attended) or 0;
-				local missed = tonumber(playerData.Absent) or 0;
-				local percent = tonumber(playerData.Percent) or 0;
-				local displayName = getLeaderboardDisplayName(v);
-				local coloredName = getLeaderboardColor(v) .. displayName .. "|r";
-				text = text .. string.format("%d. %s - AP: %d M: %d %d%%\n", plRank, coloredName, attended, missed, percent);
+			local d = RAT_SavedData.Attendance[v];
+			local shown = v;
+			local idx = RAT:GetGuildMemberIndex(v);
+			if (idx ~= -1) then
+				local classFile = select(11, GetGuildRosterInfo(idx));
+				local c = classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile];
+				if (c) then
+					shown = "|c" .. c.colorStr .. v .. "|r";
+				end
 			end
+			names = names .. d.Rank .. ".  " .. shown .. "\n";
+			aps = aps .. d.Attended .. "\n";
+			ms = ms .. d.Absent .. "\n";
+			pcts = pcts .. d.Percent .. "%\n";
 		end
 	end
-	leaderboardText:SetText(text);
+	lbName:SetText(names);
+	lbAP:SetText(aps);
+	lbM:SetText(ms);
+	lbPct:SetText(pcts);
+	lbContent:SetHeight(math.max(lbName:GetStringHeight(), 1) + 8);
 end
 
 function RAT:InitRaidTimes()
@@ -178,18 +165,6 @@ function RAT:SendDebugMessage(msg)
 	end
 end
 
-local function normalizeWhisperMessage(msg)
-	if (type(msg) ~= "string") then
-		return "";
-	end
-	return string.lower(msg):gsub("^%s+", ""):gsub("%s+$", "");
-end
-
-local function isRatWhisperCommand(msg)
-	local text = normalizeWhisperMessage(msg);
-	return text == "!rat" or text:match("^!rat%s") ~= nil;
-end
-
 --[[
 	Handles all chat commands 
 	param(msg) string
@@ -198,12 +173,26 @@ local function handler(msg, editbox)
 	local arg = RAT:GetArg(msg);
 	local cmd = RAT:GetCmd(string.lower(msg));
 	if (cmd ~= "") then
-		if (synced and C_GuildInfo.CanEditOfficerNote()) then
+		if (cmd == "ranks") then
+			-- Read-only: any synced guild member (officer or not) may view the rankings.
+			if (synced) then
+				RAT:RequestFreshest();
+				C_Timer.After(1.5, function()
+					RAT:UpdateRank();
+					updateLeaderboard();
+					if (not leaderBoard:IsShown()) then
+						leaderBoard:Show();
+					end
+				end);
+			else
+				DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.SYSTEM_STILL_SYNCING1 .. math.floor(syncDelay+0.5) .. L.SYSTEM_STILL_SYNCING3);
+			end
+		elseif (synced and C_GuildInfo.CanEditOfficerNote()) then
 			if (cmd == "award") then
 				local args = RAT:Split(arg);
 				if (RAT:GetSize(args) == 1) then
-					RAT:AllAttended(arg);
-					RAT:BroadcastOperation("AWARDALL", tostring(arg));
+					RAT:AllAttended(tonumber(arg), true);
+					RAT:BroadcastCommand("AWARDALL", { tonumber(arg) });
 				elseif (RAT:GetSize(args) == 2 and tonumber(args[2])) then
 					args[1] = args[1]:gsub("^%l", string.upper);
 					if (RAT:GetMain(args[1])) then
@@ -211,12 +200,10 @@ local function handler(msg, editbox)
 					end
 					local index = RAT:GetGuildMemberIndex(args[1]);
 					if (index ~= -1 and RAT:Eligible(index)) then
-						RAT:PlayerAttended(args[1], args[2]);
-						C_Timer.After(2, function() RAT:UpdatePlayerAlts(args[1]); end);
-						if (C_GuildInfo.CanEditOfficerNote()) then
-							C_ChatInfo.SendChatMessage(L.ADDON .. args[1] .. L.BROADCAST_AWARDED_PLAYER1 .. args[2] .. L.BROADCAST_AWARDED_PLAYER2, "GUILD");
-						end
-						RAT:BroadcastOperation("AWARD", RAT:NormalizePlayerName(args[1]) .. ":" .. tostring(args[2]));
+						RAT:PlayerAttended(args[1], tonumber(args[2]));
+						RAT:RebuildRanks();
+						RAT:SendGuild(L.ADDON .. args[1] .. L.BROADCAST_AWARDED_PLAYER1 .. args[2] .. L.BROADCAST_AWARDED_PLAYER2);
+						RAT:BroadcastCommand("AWARD", { args[1], tonumber(args[2]) });
 					else
 						DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. args[1] .. L.ERROR_PLAYER_INELIGIBLE);
 					end
@@ -232,12 +219,10 @@ local function handler(msg, editbox)
 					end
 					local index = RAT:GetGuildMemberIndex(args[1]);
 					if (index ~= -1 and RAT:Eligible(index)) then
-						RAT:PlayerAbsent(args[1], args[2]);
-						C_Timer.After(2, function() RAT:UpdatePlayerAlts(args[1]); end);
-						if (C_GuildInfo.CanEditOfficerNote()) then
-							C_ChatInfo.SendChatMessage(L.ADDON .. args[1] .. L.BROADCAST_ABSENT_PLAYER1 .. args[2] .. L.BROADCAST_ABSENT_PLAYER2, "GUILD");
-						end
-						RAT:BroadcastOperation("ABSENT", RAT:NormalizePlayerName(args[1]) .. ":" .. tostring(args[2]));
+						RAT:PlayerAbsent(args[1], tonumber(args[2]));
+						RAT:RebuildRanks();
+						RAT:SendGuild(L.ADDON .. args[1] .. L.BROADCAST_ABSENT_PLAYER1 .. args[2] .. L.BROADCAST_ABSENT_PLAYER2);
+						RAT:BroadcastCommand("ABSENT", { args[1], tonumber(args[2]) });
 					else
 						DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. args[1] .. L.ERROR_PLAYER_INELIGIBLE);
 					end
@@ -246,7 +231,7 @@ local function handler(msg, editbox)
 				end
 			elseif (cmd == "strike") then
 				local args = RAT:Split(arg);
-				local amount = args[2] or 1;
+				local amount = tonumber(args[2]) or 1;
 				args[1] = args[1]:gsub("^%l", string.upper);
 				if (RAT:GetMain(args[1])) then
 					args[1] = RAT:GetMain(args[1]);
@@ -254,11 +239,9 @@ local function handler(msg, editbox)
 				local index = RAT:GetGuildMemberIndex(args[1]);
 				if (index ~= -1 and RAT:Eligible(index)) then
 					RAT:StrikePlayer(args[1], amount);
-					C_Timer.After(2, function() RAT:UpdatePlayerAlts(args[1]); end);
-					if (C_GuildInfo.CanEditOfficerNote()) then
-						C_ChatInfo.SendChatMessage(L.ADDON .. args[1] .. L.BROADCAST_STRIKE_PLAYER1 .. amount .. L.BROADCAST_STRIKE_PLAYER2, "GUILD");
-					end
-					RAT:BroadcastOperation("STRIKE", RAT:NormalizePlayerName(args[1]) .. ":" .. tostring(amount));
+					RAT:RebuildRanks();
+					RAT:SendGuild(L.ADDON .. args[1] .. L.BROADCAST_STRIKE_PLAYER1 .. amount .. L.BROADCAST_STRIKE_PLAYER2);
+					RAT:BroadcastCommand("STRIKE", { args[1], amount });
 				else
 					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. args[1] .. L.ERROR_PLAYER_INELIGIBLE);
 				end
@@ -269,15 +252,13 @@ local function handler(msg, editbox)
 					args[1] = RAT:GetMain(args[1]);
 				end
 				local index = RAT:GetGuildMemberIndex(args[1]);
-				if (index ~= -1 and RAT:Eligible(index)) then
-					RAT:Import(args[1], args[2], args[3]);
-					C_Timer.After(2, function() RAT:UpdatePlayerAlts(args[1]); end);
-					if (C_GuildInfo.CanEditOfficerNote()) then
-						C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_IMPORT_PLAYER1 .. args[1] .. L.BROADCAST_IMPORT_PLAYER2 .. args[2] .. L.BROADCAST_IMPORT_PLAYER3 .. args[3] .. L.BROADCAST_IMPORT_PLAYER4, "GUILD");
-					end
-					RAT:BroadcastOperation("IMPORT", RAT:NormalizePlayerName(args[1]) .. ":" .. tostring(args[2]) .. ":" .. tostring(args[3]));
+				if (index ~= -1 and RAT:Eligible(index) and tonumber(args[2]) and tonumber(args[3])) then
+					RAT:Import(args[1], tonumber(args[2]), tonumber(args[3]));
+					RAT:RebuildRanks();
+					RAT:SendGuild(L.ADDON .. L.BROADCAST_IMPORT_PLAYER1 .. args[1] .. L.BROADCAST_IMPORT_PLAYER2 .. args[2] .. L.BROADCAST_IMPORT_PLAYER3 .. args[3] .. L.BROADCAST_IMPORT_PLAYER4);
+					RAT:BroadcastCommand("IMPORT", { args[1], tonumber(args[2]), tonumber(args[3]) });
 				else
-					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. args[1] .. L.ERROR_PLAYER_INELIGIBLE);
+					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. L.SYNTAX_IMPORT);
 				end
 			elseif (cmd == "update") then
 				RAT:UpdateRank();
@@ -290,15 +271,12 @@ local function handler(msg, editbox)
 				local index = RAT:GetGuildMemberIndex(arg);
 				if (index ~= -1 and RAT:Eligible(index)) then
 					RAT:DeletePlayer(arg);
-						C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_DELETED_PLAYER .. arg .. L.DOT, "GUILD");
-					RAT:BroadcastOperation("DELETE", RAT:NormalizePlayerName(arg));
+					RAT:RebuildRanks();
+					RAT:SendGuild(L.ADDON .. L.BROADCAST_DELETED_PLAYER .. arg .. L.DOT);
+					RAT:BroadcastCommand("DELETEPLAYER", { arg });
 				else
 					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. arg .. L.ERROR_PLAYER_INELIGIBLE);
 				end
-			--elseif (cmd == "winter") then
-			--	RAT_SavedData.NextAward = RAT_SavedData.NextAward + 3600;
-			--elseif (cmd == "summer") then
-			--	RAT_SavedData.NextAward = RAT_SavedData.NextAward - 3600;
 			elseif (cmd == "swap") then
 				arg = arg:gsub("^%l", string.upper);
 				if (RAT:GetMain(arg)) then
@@ -308,8 +286,9 @@ local function handler(msg, editbox)
 				if (index ~= -1 and RAT:Eligible(index)) then
 					RAT:PlayerAbsent(arg, 1);
 					RAT:PlayerAttended(arg, -1);
-						C_ChatInfo.SendChatMessage(L.ADDON .. arg .. L.BROADCAST_SWAPED_PLAYER, "GUILD");
-					RAT:BroadcastOperation("SWAP", RAT:NormalizePlayerName(arg));
+					RAT:RebuildRanks();
+					RAT:SendGuild(L.ADDON .. arg .. L.BROADCAST_SWAPED_PLAYER);
+					RAT:BroadcastCommand("SWAP", { arg });
 				else
 					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. arg .. L.ERROR_PLAYER_INELIGIBLE);
 				end
@@ -318,28 +297,21 @@ local function handler(msg, editbox)
 				RAT:BroadcastSummary();
 				RAT_SavedData.Bench = {};
 				RAT_SavedData.Summary = {};
-			elseif (cmd == "ranks") then
-				RAT:UpdateRank();
-				if (leaderBoard:IsShown()) then
-					leaderBoard:Hide();
-				else
-					updateLeaderboard();
-					leaderBoard:Show();
-				end
 			elseif (cmd == "bench") then
 				local args = RAT:Split(arg);
 				if (RAT:GetSize(args) == 1) then
 					arg = arg:gsub("^%l", string.upper);
 					if (RAT:GetMain(arg)) then
 						arg = RAT:GetMain(arg);
-						arg = Ambiguate(arg, "none");
+						arg = RAT:CleanName(arg);
 					end
 					local index = RAT:GetGuildMemberIndex(arg);
 					if (index ~= -1 and RAT:Eligible(index)) then
 						if (not RAT:IsBenched(arg)) then
 							RAT_SavedData.Bench[RAT:GetSize(RAT_SavedData.Bench)+1] = arg;
-							C_ChatInfo.SendChatMessage(L.ADDON .. arg .. L.BROADCAST_BENCHED_PLAYER, "GUILD");
-							RAT:SendSyncAddonMessage("RATSYSTEM", "BENCH " .. arg, "GUILD");
+							RAT:Touch();
+							RAT:SendGuild(L.ADDON .. arg .. L.BROADCAST_BENCHED_PLAYER);
+							RAT:BroadcastCommand("BENCH", { arg });
 						else
 							DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. arg .. L.ERROR_BENCHED_ALREADY);
 						end
@@ -349,24 +321,22 @@ local function handler(msg, editbox)
 				end
 			elseif (cmd == "alt") then
 				local args = RAT:Split(arg);
-				args[1] = args[1]:gsub("^%l", string.upper);
-				args[2] = args[2]:gsub("^%l", string.upper);
 				if (RAT:GetSize(args) == 2) then
+					args[1] = args[1]:gsub("^%l", string.upper);
+					args[2] = args[2]:gsub("^%l", string.upper);
 					local mainIndex = RAT:GetGuildMemberIndex(args[1]);
 					local altIndex = RAT:GetGuildMemberIndex(args[2]);
-					if (args[1] ~= args[2]) then
-						local mainName = RAT:NormalizePlayerName(args[1]);
-						local altName  = RAT:NormalizePlayerName(args[2]);
-						local alreadyLinked = RAT_SavedData.AltDb[altName] and RAT_SavedData.AltDb[altName].Main == mainName;
-						if (not alreadyLinked and mainIndex ~= -1 and RAT:Eligible(mainIndex) and altIndex ~= -1) then
-							RAT_SavedData.AltDb[altName] = { Main = mainName, Timestamp = GetServerTime() };
-							RAT:BroadcastAlt(altName, mainName);
-							DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.SUCCESS .. L.ADDON .. args[2] .. L.SYSTEM_ALT_ADDED .. args[1] .. L.DOT);
-						elseif (alreadyLinked) then
-							DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. args[1] .. L.ERROR_ALT_ALREADY .. args[2] .. L.DOT);
-						else
-							DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. args[1] .. L.ERROR_PLAYER_INELIGIBLE_OR .. args[2] .. L.ERROR_PLAYER_INELIGIBLE);
+					if (args[1] ~= args[2] and mainIndex ~= -1 and RAT:Eligible(mainIndex) and altIndex ~= -1) then
+						RAT_SavedData.Alts[args[2]] = args[1];
+						if (RAT_SavedData.Attendance[args[2]]) then
+							RAT_SavedData.Attendance[args[2]] = nil;
 						end
+						RAT:RebuildRanks();
+						RAT:Touch();
+						DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.SUCCESS .. L.ADDON .. args[2] .. L.SYSTEM_ALT_ADDED .. args[1] .. L.DOT);
+						RAT:BroadcastCommand("ALT", { args[2], args[1] });
+					else
+						DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. L.SYNTAX_ALT);
 					end
 				else
 					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. L.SYNTAX_ALT);
@@ -374,20 +344,12 @@ local function handler(msg, editbox)
 			elseif (cmd == "undo") then
 				if ((next(lastAttending) or next(lastAbsent)) and lastAmount) then
 					RAT:Undo(lastAttending, lastAbsent, lastAmount);
-					local attendedNames = {};
-					for _, playerName in pairs(lastAttending or {}) do
-						attendedNames[#attendedNames + 1] = RAT:NormalizePlayerName(playerName);
-					end
-					local absentNames = {};
-					for _, playerName in pairs(lastAbsent or {}) do
-						absentNames[#absentNames + 1] = RAT:NormalizePlayerName(playerName);
-					end
-					RAT:BroadcastOperation("UNDO", tostring(lastAmount) .. ":" .. table.concat(attendedNames, ",") .. ":" .. table.concat(absentNames, ","));
+					RAT:BroadcastCommand("UNDO", {});
 				else
 					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. L.ERROR_UNDO);
 				end
 			elseif (cmd == "sync") then
-				RAT:BroadcastFullSync();
+				RAT:RequestFreshest();
 				DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.SUCCESS .. L.ADDON .. L.SYSTEM_STARTED_SYNC);
 			elseif (cmd == "debug") then
 				if (RAT_SavedOptions.Debug == false) then
@@ -404,7 +366,7 @@ local function handler(msg, editbox)
 			DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.SYSTEM_STILL_SYNCING1 .. math.floor(syncDelay+0.5) .. L.SYSTEM_STILL_SYNCING3);
 		end
 	else
-		Settings.OpenToCategory(RAT:GetRTOptionsID());
+		Settings.OpenToCategory(RAT.OptionsCategories.Options:GetID());
 	end
 end
 
@@ -416,7 +378,6 @@ f:RegisterEvent("CHAT_MSG_RAID_LEADER");
 f:RegisterEvent("CHAT_MSG_WHISPER");
 f:RegisterEvent("CHAT_MSG_ADDON");
 f:RegisterEvent("GUILD_ROSTER_UPDATE");
-f:RegisterEvent("PLAYER_REGEN_ENABLED");
 C_ChatInfo.RegisterAddonMessagePrefix("RATSYSTEM");
 
 f:SetScript("OnUpdate", function(self, elapsed)
@@ -427,54 +388,54 @@ f:SetScript("OnUpdate", function(self, elapsed)
 		syncDelay = syncDelay - elapsed;
 	end
 	if (syncDelay <= 0 and not synced) then
-		RAT:SendDebugMessage("Sync delay has passed. Requesting Guild Roster..., Broadcasting data version.");
+		RAT:SendDebugMessage("Sync delay has passed. Requesting Guild Roster..., Starting Sync");
 		synced = true;
 		C_GuildInfo.GuildRoster();
-		-- All clients broadcast their data version; officers with newer data reply with BroadcastFullSync.
-		RAT:BroadcastDataVersion();
-		RAT:ProcessPendingAttendanceInitialization();
+		RAT:ReconcileRoster();
+		RAT:BroadcastVersion();
 	end
 	local time = GetServerTime();
 	if (time > RAT_SavedData.NextAward and RAT_SavedData.NextAward ~= 0) then
 		local freq = RAT_SavedOptions.Frequency * 60;
 		if (time > RAT_SavedData.NextAward + 60) then --Player is considered late
-			RAT:SendDebugMessage("The time for NextAward: " .. RAT_SavedData.NextAward .. " has passed as time is: " .. time .. " but the player is considered late.");
+			RAT:SendDebugMessage("The time for NextAward: " .. RAT_SavedData.NextAward .. " has passed as time is: " .. time .. " but the player is considered late causing no rewards to be given out and calculating when the next reward should be...");
 			RAT:RecoverNextAward(time);
+			RAT_SavedData.Summary = {};
 			if (C_GuildInfo.CanEditOfficerNote()) then
 				RAT:BroadcastNextAward(RAT:FromSecondsToBestUnit(RAT_SavedData.NextAward-time));
+				C_ChatInfo.SendAddonMessage("RATSYSTEM", "GETBENCH", "GUILD");
 			end
-			RAT_SavedData.Summary = {};
-			RAT:SendSyncAddonMessage("RATSYSTEM", "GETBENCH", "GUILD");
 		else
 			if (RAT:IsItRaidStart()) then
 				RAT_SavedData.Bench = {};
 				RAT_SavedData.Summary = {};
 				if (not RAT_SavedOptions.AwardStart) then
-					RAT:SendDebugMessage("The time for NextAward: " .. RAT_SavedData.NextAward .. " has passed as time is: " .. time .. " but rewards on raid start is turned off.");
+					RAT:SendDebugMessage("NextAward passed but rewards on raid start is turned off.");
 					RAT:SetNextAward(time);
-					--Dont award raid start
 					return;
 				end
 			end
-			RAT:SendDebugMessage("The time for NextAward: " .. RAT_SavedData.NextAward .. " has passed as time is: " .. time .. " and rewards will be given out.");
+			RAT:SendDebugMessage("NextAward passed; rewards will be given out.");
 			RAT:SetNextAward(time);
-			if (IsInRaid() and synced) then
-				-- All clients apply the award locally from the shared NextAward timestamp.
-				-- Guild chat is posted from AllAttended() internally (IsMaster or
-				-- IsHighestRankingRaidOfficer when master is absent).
-				-- OnUpdate only handles the officer-exclusive follow-up tasks.
-				RAT:AllAttended(1);
-				if (RAT:IsHighestRankingRaidOfficer()) then
-					RAT:BroadcastFullSync();
-					if (RAT_SavedOptions.PunishCalendar and RAT:IsItRaidStart()) then
+			if (IsInRaid()) then
+				RAT.Users = {};   -- reset so only officers who respond this round are considered for posting
+				C_ChatInfo.SendAddonMessage("RATSYSTEM", "GETRANK", "RAID");
+				C_Timer.After(10, function()
+					local amPoster = (RAT:GetHighestRankingUser() == GetUnitName("player", true)) and C_GuildInfo.CanEditOfficerNote() and true or false;
+					RAT:AllAttended(1, amPoster);
+					if (RAT_SavedOptions.PunishCalendar and RAT:IsItRaidStart() and amPoster) then
 						RAT:PunishCalendar();
 					end
-					RAT:BroadcastNextAward(RAT:FromSecondsToBestUnit(RAT_SavedData.NextAward-time));
+					if (amPoster) then
+						RAT:BroadcastNextAward(RAT:FromSecondsToBestUnit(RAT_SavedData.NextAward-time));
+					end
 					if (RAT:IsItRaidFinish()) then
 						RAT:SendDebugMessage("Raid ended. Sending summary and reseting variables...");
 						C_Timer.NewTicker(1, function(s)
 							if (not RAT:IsAwardHandOutRunning()) then
-								RAT:BroadcastSummary();
+								if (amPoster) then
+									RAT:BroadcastSummary();
+								end
 								RAT_SavedData.Bench = {};
 								RAT_SavedData.Summary = {};
 								RAT:SendDebugMessage("Variables have been reset");
@@ -483,7 +444,7 @@ f:SetScript("OnUpdate", function(self, elapsed)
 							end
 						end);
 					end
-				end
+				end);
 			end
 		end
 	end
@@ -504,33 +465,7 @@ f:SetScript("OnEvent", function(self, event, ...)
 			if (RAT_SavedOptions == nil) then RAT_SavedOptions = {}; end
 
 			if (RAT_SavedData.Attendance == nil) then RAT_SavedData.Attendance = {}; end
-			if (RAT_SavedData.AltDb == nil) then RAT_SavedData.AltDb = {}; end
-
-			-- Migrate AltDb from old nested format {[main]={Alts=[...],IsAlt=bool}}
-			-- to new flat format {[altName]={Main="mainName",Timestamp=serverTime}}.
-			-- Detection: any entry that contains a numeric-keyed .Alts sub-table is old format.
-			do
-				local needsMigration = false;
-				for _, data in pairs(RAT_SavedData.AltDb) do
-					if type(data) == "table" and data.Alts then
-						needsMigration = true;
-						break;
-					end
-				end
-				if needsMigration then
-					local newAltDb = {};
-					local now = GetServerTime();
-					for main, data in pairs(RAT_SavedData.AltDb) do
-						if type(data) == "table" and data.Alts and not data.IsAlt then
-							for _, alt in pairs(data.Alts) do
-								newAltDb[alt] = { Main = main, Timestamp = now };
-							end
-						end
-					end
-					RAT_SavedData.AltDb = newAltDb;
-				end
-			end
-
+			--if (RAT_SavedData.AltDb == nil) then RAT_SavedData.AltDb = {}; end
 			if (RAT_SavedData.Ranks == nil) then RAT_SavedData.Ranks = {}; end
 			if (RAT_SavedData.Log == nil) then RAT_SavedData.Log = {}; end
 			if (RAT_SavedData.NextAward == nil) then RAT_SavedData.NextAward = 0; end
@@ -538,62 +473,23 @@ f:SetScript("OnEvent", function(self, event, ...)
 			if (RAT_SavedData.Summary == nil) then RAT_SavedData.Summary = {}; end
 			if (RAT_SavedData.SetupCompleted == nil) then RAT_SavedData.SetupCompleted = false; end
 			if (RAT_SavedData.DebugLog == nil) then RAT_SavedData.DebugLog = {}; end
-			if (RAT_SavedData.MasterOfficer == nil) then RAT_SavedData.MasterOfficer = nil; end
-			if (RAT_SavedData.FullSyncBuffer == nil) then RAT_SavedData.FullSyncBuffer = {}; end
+			if (RAT_SavedData.Alts == nil) then RAT_SavedData.Alts = {}; end
+			if (RAT_SavedData.LastModified == nil) then RAT_SavedData.LastModified = 0; end
+
 			if (RAT_SavedOptions.RaidTimes == nil) then RAT:InitRaidTimes(); end
 			if (RAT_SavedOptions.AwardStart == nil) then RAT_SavedOptions.AwardStart = true; end
 			if (RAT_SavedOptions.Frequency == nil) then RAT_SavedOptions.Frequency = 60; end
 			if (RAT_SavedOptions.RankingAlgo == nil) then RAT_SavedOptions.RankingAlgo = "RAT-Algorithm"; end
 			if (RAT_SavedOptions.PunishCalendar == nil) then RAT_SavedOptions.PunishCalendar = false; end
 			if (RAT_SavedOptions.RaiderRanks == nil) then RAT_SavedOptions.RaiderRanks = {}; end
+			if (RAT_SavedOptions.OfficerRanks == nil) then RAT_SavedOptions.OfficerRanks = {}; end
 			if (RAT_SavedOptions.Debug == nil) then RAT_SavedOptions.Debug = false; end
-
-			-- Upgrade existing attendance records to include LastModified timestamp
-			for playerName, data in pairs(RAT_SavedData.Attendance) do
-				if (data.LastModified == nil) then
-					data.LastModified = GetServerTime();
-				end
-			end
 		end
-	elseif (event == "PLAYER_LOGIN") then
-		-- All clients broadcast their data version on login.
-		-- Any officer who receives a DATAVERSION lower than their own will reply with BroadcastFullSync.
-		-- Any client who receives a DATAVERSION higher than theirs (from an officer) will request REQFULLSYNC.
-		C_Timer.After(1, function()
-			if (IsInGuild()) then
-				RAT:BroadcastDataVersion();
-			end
-		end);
-		if (IsInGuild()) then
-			RAT:QueueAttendanceInitialization();
-			C_GuildInfo.GuildRoster();
-		end
-		C_Timer.After(5, function()
-			if (C_GuildInfo.CanEditOfficerNote()) then
-				RAT:CheckForDSTTransition();
-			end
-		end);
-		if (not RAT_SavedData.SetupCompleted and IsInGuild()) then
-			C_Timer.After(0, function()
-				if (RAT:IsSyncComplete()) then
-					RAT:StartSetup();
-				else
-					C_Timer.NewTicker(0.5, function(t)
-						if (RAT:IsSyncComplete()) then
-							RAT:StartSetup();
-							t:Cancel();
-						end
-					end);
-				end
-			end);
-		end
-	elseif (event == "PLAYER_REGEN_ENABLED") then
-		RAT:FlushSyncQueue();
 	elseif (event == "CHAT_MSG_RAID" or event == "CHAT_MSG_RAID_LEADER") then
 		local message, sender = ...;
 		message = string.lower(message);
 		if (message == "!rat" and synced) then
-			sender = Ambiguate(sender, "none");
+			sender = RAT:CleanName(sender);
 			ticks = 6;
 			playersRegister = true;
 			playersToRank[currentIndex] = sender;
@@ -602,236 +498,90 @@ f:SetScript("OnEvent", function(self, event, ...)
 	elseif (event == "CHAT_MSG_WHISPER") then
 		local message, sender = ...;
 		local fullNameSender = sender;
-		local normalizedMessage = normalizeWhisperMessage(message);
-		sender = Ambiguate(sender, "none");
-		local arg = RAT:GetArg(normalizedMessage);
-		local cmd = RAT:GetCmd(normalizedMessage);
-		if (cmd == "!rat") then
-			local args = RAT:Split(arg);
-			local index = RAT:GetGuildMemberIndex(sender);
-			if (arg == "bench") then
-				if (C_GuildInfo.CanEditOfficerNote()) then
-					if (RAT:GetMain(sender)) then
-						local main = RAT:GetMain(sender);
-						sender = main;
-						index = RAT:GetGuildMemberIndex(main);
-					end
-					if (RAT:Eligible(index) and not RAT:IsBenched(sender)) then
-						RAT_SavedData.Bench[RAT:GetSize(RAT_SavedData.Bench)+1] = sender;
-						C_ChatInfo.SendChatMessage(L.ADDON .. sender .. L.BROADCAST_BENCHED_PLAYER, "GUILD");
-						RAT:SendSyncAddonMessage("RATSYSTEM", "BENCH " .. fullNameSender, "GUILD");
-					elseif (RAT:IsBenched(sender)) then
-						C_ChatInfo.SendChatMessage(L.ADDON .. sender .. L.ERROR_BENCHED_ALREADY, "WHISPER", nil, sender);
-					end
-				else
-					--Cant Promote
-				end
-			elseif (RAT:GetSize(args) == 2 and args[1] == "alt") then
-				if (C_GuildInfo.CanEditOfficerNote()) then
-					local main = args[2];
-					main = main:gsub("^%l", string.upper);
-					local mainIndex = RAT:GetGuildMemberIndex(main);
-					local altIndex = RAT:GetGuildMemberIndex(sender);
-					if (sender ~= main) then
-						if (mainIndex ~= -1 and RAT:Eligible(mainIndex) and altIndex ~= -1) then
-							local altName = RAT:NormalizePlayerName(sender);
-							local mainName = RAT:NormalizePlayerName(main);
-							RAT_SavedData.AltDb[altName] = { Main = mainName, Timestamp = GetServerTime() };
-							RAT:BroadcastAlt(altName, mainName);
-							C_ChatInfo.SendChatMessage(L.ADDON .. sender .. L.SYSTEM_ALT_ADDED .. main .. L.DOT, "WHISPER", nil, sender);
-						else
-							C_ChatInfo.SendChatMessage(L.ADDON .. main .. L.ERROR_PLAYER_INELIGIBLE, "WHISPER", nil, sender);
+		local replyTo = RAT:WhisperTarget(fullNameSender); -- full Name-Realm for whisper replies
+		message = strtrim(string.lower(message)); -- tolerate case / stray whitespace
+		sender = RAT:CleanName(sender);
+		local arg = RAT:GetArg(message);
+		local cmd = RAT:GetCmd(message);
+			if (cmd == "!rat") then
+				local args = RAT:Split(arg);
+				local index = RAT:GetGuildMemberIndex(sender);
+				if (arg == "bench") then
+					if (C_GuildInfo.CanEditOfficerNote()) then
+						if (RAT:GetMain(sender)) then
+							local main = RAT:GetMain(sender);
+							sender = main;
+							index = RAT:GetGuildMemberIndex(main);
+						end
+						if (RAT:Eligible(index) and not RAT:IsBenched(sender)) then
+							RAT_SavedData.Bench[RAT:GetSize(RAT_SavedData.Bench)+1] = sender;
+							RAT:Touch();
+							RAT:SendGuild(L.ADDON .. sender .. L.BROADCAST_BENCHED_PLAYER);
+							RAT:BroadcastCommand("BENCH", { sender });
+						elseif (RAT:IsBenched(sender)) then
+							C_ChatInfo.SendChatMessage(L.ADDON .. sender .. L.ERROR_BENCHED_ALREADY, "WHISPER", nil, replyTo);
 						end
 					end
-				else					--Cant promote
-				end
-			elseif (arg == "help") then
-				C_ChatInfo.SendChatMessage(L.ADDON .. L.HELP1, "WHISPER", nil, sender);
-				C_ChatInfo.SendChatMessage(L.HELP2, "WHISPER", nil, sender);
-			elseif (arg == "stats") then
-				local playerName = sender;
-				if (RAT:GetMain(sender)) then
-					playerName = RAT:GetMain(sender);
-				end
-				local playerData = RAT_SavedData.Attendance[playerName];
-				if (playerData) then
-					local rank = playerData.Rank or 99;
-					local attended = tonumber(playerData.Attended) or 0;
-					local missed = tonumber(playerData.Absent) or 0;
-					local percent = tonumber(playerData.Percent) or 0;
-					C_ChatInfo.SendChatMessage(L.ADDON .. string.format(L.STATS_RESPONSE, rank, attended, missed, percent), "WHISPER", nil, sender);
-				else
-					C_ChatInfo.SendChatMessage(L.ADDON .. L.STATS_NO_DATA, "WHISPER", nil, sender);
+				elseif (RAT:GetSize(args) == 2 and args[1] == "alt") then
+					if (C_GuildInfo.CanEditOfficerNote()) then
+						local main = args[2]:gsub("^%l", string.upper);
+						local mainIndex = RAT:GetGuildMemberIndex(main);
+						local altIndex = RAT:GetGuildMemberIndex(sender);
+						if (sender ~= main and mainIndex ~= -1 and RAT:Eligible(mainIndex) and altIndex ~= -1) then
+							RAT_SavedData.Alts[sender] = main;
+							if (RAT_SavedData.Attendance[sender]) then
+								RAT_SavedData.Attendance[sender] = nil;
+							end
+							RAT:RebuildRanks();
+							RAT:Touch();
+							C_ChatInfo.SendChatMessage(L.ADDON .. sender .. L.SYSTEM_ALT_ADDED .. main .. L.DOT, "WHISPER", nil, replyTo);
+							RAT:BroadcastCommand("ALT", { sender, main });
+						else
+							C_ChatInfo.SendChatMessage(L.ADDON .. args[2] .. L.ERROR_PLAYER_INELIGIBLE, "WHISPER", nil, replyTo);
+						end
+					end
+				elseif (arg == "help") then
+					C_ChatInfo.SendChatMessage(L.ADDON .. L.HELP1, "WHISPER", nil, replyTo);
+					C_ChatInfo.SendChatMessage(L.HELP2, "WHISPER", nil, replyTo);
+				elseif (arg == "myrank") then
+					local target = sender;
+					if (RAT:GetMain(sender)) then target = RAT:GetMain(sender); end
+					local d = RAT_SavedData.Attendance[target];
+					if (d) then
+						C_ChatInfo.SendChatMessage(L.ADDON .. L.MYRANK1 .. d.Rank .. L.MYRANK2 .. d.Attended .. L.MYRANK3 .. d.Absent .. L.MYRANK4 .. d.Percent .. "%", "WHISPER", nil, replyTo);
+					else
+						C_ChatInfo.SendChatMessage(L.ADDON .. L.MYRANK_NONE, "WHISPER", nil, replyTo);
+					end
 				end
 			end
-		end
 	elseif (event == "CHAT_MSG_ADDON") then
 		local prefix, msg, channel, sender = ...;
-		sender = Ambiguate(sender, "none");
-		if (prefix == "RATSYSTEM" and GetUnitName("player") ~= sender) then
-			local msgParts = RAT:Split(msg);
-			local internalPrefix = msg:match("^([^|]+)");
-			if internalPrefix then
-				internalPrefix = internalPrefix:match("^(%S+)");
-			elseif msgParts[1] then
-				internalPrefix = msgParts[1];
-			end
-
-			if (internalPrefix and internalPrefix == "BENCH") then
-				-- All clients maintain bench list so timer awards are consistent
-				local raider = Ambiguate(msgParts[2], "none");
-				if (raider and not RAT:IsBenched(raider)) then
-					RAT_SavedData.Bench[RAT:GetSize(RAT_SavedData.Bench)+1] = raider;
-				end
-			elseif (internalPrefix and internalPrefix == "GETRANK" and synced) then
-				if (C_GuildInfo.CanEditOfficerNote()) then
-					local name, server = UnitFullName("player");
-					local sendMsg = "RETURNRANK " .. name .. "-" .. server .. " " .. select(3, GetGuildInfo("player"));
-					RAT:SendSyncAddonMessage("RATSYSTEM", sendMsg, "WHISPER", sender);
-				end
-
-			-- Handle new sync messages
-			elseif (internalPrefix and internalPrefix == "FULLSYNC") then
-				local batchLabel, dataChunk = msg:match("^FULLSYNC%|([^|]+)%|(.*)$");
-				if batchLabel and dataChunk then
-					RAT:SendDebugMessage("FULLSYNC chunk from " .. sender ..
-						" label=" .. batchLabel .. " chunkLen=" .. string.len(dataChunk));
-					RAT:ReceiveFullSync(batchLabel, dataChunk, sender);
-				else
-					RAT:SendDebugMessage("FULLSYNC parse FAILED from " .. sender .. " msg=" .. string.sub(msg,1,80));
-				end
-
-			elseif (internalPrefix and internalPrefix == "UPDATE") then
-				local timestampText, updateData = msg:match("^UPDATE%|([^|]+)%|(.*)$");
-				if timestampText and updateData then
-					local timestamp = tonumber(timestampText);
-					RAT:ReceiveUpdate(timestamp, updateData, sender);
-				end
-
-			elseif (internalPrefix and internalPrefix == "OP") then
-				local opId, opCode, payload = msg:match("^OP%|([^|]+)%|([^|]+)%|(.*)$");
-				if (opId and opCode) then
-					RAT:ReceiveOperation(opId, opCode, payload, sender);
-				end
-
-			elseif (internalPrefix and internalPrefix == "ALT") then
-				local altName, mainName, timestamp = msg:match("^ALT%|([^|]+)%|([^|]+)%|([^|]+)$");
-				if (altName and mainName and timestamp) then
-					RAT:ReceiveAlt(altName, mainName, tonumber(timestamp), sender);
-				end
-
-			elseif (internalPrefix and internalPrefix == "DATAVERSION") then
-				local senderVersion = tonumber(msg:match("^DATAVERSION%|(%d+)$"));
-				if (senderVersion) then
-					local myVersion = RAT:GetMaxDataVersion();
-					RAT:SendDebugMessage("DATAVERSION from " .. sender ..
-						" theirV=" .. senderVersion .. " myV=" .. myVersion ..
-						" iOfficer=" .. tostring(C_GuildInfo.CanEditOfficerNote()));
-					if (senderVersion < myVersion and C_GuildInfo.CanEditOfficerNote()) then
-						-- I have newer data; send it (throttle to once per 30 seconds)
-						local now = GetServerTime();
-						local throttled = RAT._lastFullSyncBroadcast and (now - RAT._lastFullSyncBroadcast) <= 30;
-						RAT:SendDebugMessage("DATAVERSION: I have newer data → " ..
-							(throttled and "THROTTLED (" .. tostring(now - (RAT._lastFullSyncBroadcast or 0)) .. "s ago)" or "sending BroadcastFullSync"));
-						if (not throttled) then
-							RAT._lastFullSyncBroadcast = now;
-							C_Timer.After((math.random(0, 25) / 100), function()
-								RAT:BroadcastFullSync();
-							end);
-						end
-					elseif (senderVersion > myVersion and RAT:CanSenderEditOfficerNote(sender)) then
-						RAT:SendDebugMessage("DATAVERSION: sender has newer data → sending REQFULLSYNC");
-						RAT:SendSyncAddonMessage("RATSYSTEM", "REQFULLSYNC", "GUILD");
-					elseif (senderVersion > myVersion) then
-						RAT:SendDebugMessage("DATAVERSION: sender has newer data but is NOT an officer – ignoring");
-					end
-				else
-					RAT:SendDebugMessage("DATAVERSION parse FAILED from " .. sender .. " msg=" .. msg);
-				end
-
-			elseif (internalPrefix and internalPrefix == "REQFULLSYNC") then
-				if (C_GuildInfo.CanEditOfficerNote()) then
-					RAT:SendDebugMessage("REQFULLSYNC from " .. sender .. " → sending BroadcastFullSync");
-					-- Small random jitter avoids simultaneous officer replies.
-					C_Timer.After((math.random(0, 25) / 100), function()
-						RAT:BroadcastFullSync();
-					end);
-				else
-					RAT:SendDebugMessage("REQFULLSYNC from " .. sender .. " – ignored (not an officer)");
-				end
-
-			-- Legacy message handling (old system)
-			elseif (internalPrefix and internalPrefix == "SYNCATTENDANCE") then
-				awaitingSync = true;
-				C_GuildInfo.GuildRoster();
-				if (C_GuildInfo.CanEditOfficerNote()) then
-					local name, server = UnitFullName("player");
-					local sendMsg = "RETURNRANK " .. name .. "-" .. server .. " " .. select(3, GetGuildInfo("player"));
-					RAT:SendSyncAddonMessage("RATSYSTEM", sendMsg, "WHISPER", sender);
-				end
-			elseif (internalPrefix and internalPrefix == "RETURNRANK") then
-				if (C_GuildInfo.CanEditOfficerNote()) then
-					local user = msgParts[2];
-					local rank = tonumber(msgParts[3]);
-					if (user and rank) then
-						if (not RAT:ContainsKey(RAT.Users, user)) then
-							RAT.Users[user] = rank;
-						end
-					end
-				end
-			elseif (internalPrefix and internalPrefix == "GETBENCH") then
-				if (C_GuildInfo.CanEditOfficerNote()) then
-					for i, pl in pairs(RAT_SavedData.Bench) do
-						RAT:SendSyncAddonMessage("RATSYSTEM", "RETURNBENCH " .. pl, "WHISPER", sender);
-					end
-				end
-			elseif (internalPrefix and internalPrefix == "RETURNBENCH") then
-				-- All clients maintain bench list for consistent timer awards
-				local pl = msgParts[2];
-				if (pl and not RAT:Contains(RAT_SavedData.Bench, pl)) then
-					RAT_SavedData.Bench[RAT:GetSize(RAT_SavedData.Bench)+1] = pl;
-				end
-			--[[
-			elseif (internalPrefix and internalPrefix == "GETALTS") then
-				for player, data in pairs(RAT_SavedData.AltDb) do
-					local sendMsg = "RETURNALTS " .. player .. " " .. tostring(data.IsAlt);
-					for index, alt in pairs(data.Alts) do
-						sendMsg = sendMsg .. " " .. alt;
-					end
-					C_ChatInfo.SendAddonMessage("RATSYSTEM", sendMsg, "WHISPER", sender);
-				end
-			elseif (internalPrefix and internalPrefix == "RETURNALTS") then
-				local player = msg[2];
-				local isAlt = msg[3];
-				if (isAlt == "true") then
-					isAlt = true;
-				elseif (isAlt == "false") then
-					isAlt = false;
-				end
-				if (not RAT:ContainsKey(RAT_SavedData.AltDb, player)) then
-					RAT:InitAlt(player);
-					RAT_SavedData.AltDb[player].IsAlt = isAlt;
-				end
-				local alts = RAT_SavedData.AltDb[player].Alts;
-				for i = 4, RAT:GetSize(msg) do
-					if (not RAT:Contains(alts, msg[i])) then
-						if (not RAT:ContainsKey(RAT_SavedData.AltDb, msg[i]) and not isAlt) then
-							RAT:InitAlt(msg[i]);]]
-							--RAT_SavedData.AltDb[msg[i]].IsAlt = true;
-						--[[end
-						RAT_SavedData.AltDb[player].Alts[#alts+1] = msg[i];
-					end
-				end
-			]]
-			end
+		if (prefix == "RATSYSTEM") then
+			RAT:HandleInbound(msg, sender);
 		end
-	elseif (event == "GUILD_ROSTER_UPDATE") then
+	elseif (event == "GUILD_ROSTER_UPDATE" and C_GuildInfo.CanEditOfficerNote()) then
 		if (awaitingSync) then
 			awaitingSync = false;
-			RAT:BroadcastFullSync();
+			RAT:RebuildRanks();
 		end
-		RAT:ProcessPendingAttendanceInitialization();
-		--RAT:CleanAltDb();
+	elseif (event == "PLAYER_LOGIN") then
+		RAT:InitComms();
+		-- 4.0: every client (officer or not) runs OnUpdate so all in-raid clients compute awards locally.
+		C_Timer.After(5, function()
+			if (C_GuildInfo.CanEditOfficerNote()) then
+				RAT:CheckForDSTTransition();
+			end
+		end);
+		--[[
+			if (RAT_SavedOptions.MinimapMode == "Always") then
+				RAT_MinimapButton:Show();
+			else
+				RAT_MinimapButton:Hide();
+			end
+		]]
+		if (not RAT_SavedData.SetupCompleted and IsInGuild()) then
+			RAT:StartSetup();
+		end
 	end
 end);
 
@@ -844,7 +594,7 @@ function RAT:IsBenched(pl)
 	return false;
 end
 
-function RAT:GetBench()
+function RAT:GetBench() 
 	return RAT_SavedData.Bench;
 end
 function RAT:GetLastAttending()
@@ -896,14 +646,14 @@ end
 --CalendarGetDayEvent(monthoffset, day, index)
 
 local function benchFilterRecieve(self, event, msg)
-	if (isRatWhisperCommand(msg) and normalizeWhisperMessage(msg) == "!rat bench") then
+	if (msg == "!rat bench") then
 		return true;
 	end
 	return false;
 end
 
 local function helpFilterRecieve(self, event, msg)
-	if (isRatWhisperCommand(msg) and normalizeWhisperMessage(msg) == "!rat help") then
+	if (msg == "!rat help") then
 		return true;
 	end
 	return false;
@@ -917,35 +667,32 @@ local function helpFilterSend(self, event, msg)
 end
 
 local function altFilterSend(self, event, msg)
-	if (msg and msg:find(L.ADDON) and (msg:find(L.SYSTEM_ALT_ADDED .. L.DOT) or (msg:find(L.ERROR_PLAYER_INELIGIBLE_OR) and msg:find(L.ERROR_PLAYER_INELIGIBLE)) or msg:find(L.ERROR_ALT_ALREADY))) then
+	if (msg:find(L.ADDON) and (msg:find(L.SYSTEM_ALT_ADDED .. L.DOT) or (msg:find(L.ERROR_PLAYER_INELIGIBLE_OR) and msg:find(L.ERROR_PLAYER_INELIGIBLE)) or msg:find(L.ERROR_ALT_ALREADY))) then
 		return true;
 	end
 	return false;
 end
 
 local function altFilterRecieve(self, event, msg)
-	if (isRatWhisperCommand(msg) and normalizeWhisperMessage(msg):match("^!rat%s+alt") and msg ~= L.HELP2) then
+	if (msg:find("!rat alt") and msg ~= L.HELP2) then
 		return true;
 	end
 	return false;
 end
 
 local function benchFilterSend(self, event, msg)
-	if (msg and msg:find(L.ADDON) and msg:find(L.ERROR_BENCHED_ALREADY)) then
+	if (msg:find(L.ADDON) and msg:find(L.ERROR_BENCHED_ALREADY)) then
 		return true;
 	end
 	return false;
 end
 
-local function statsFilterRecieve(self, event, msg)
-	if (isRatWhisperCommand(msg) and normalizeWhisperMessage(msg) == "!rat stats") then
-		return true;
-	end
-	return false;
+local function myrankFilterRecieve(self, event, msg)
+	return strtrim(string.lower(msg or "")) == "!rat myrank";
 end
 
-local function statsFilterSend(self, event, msg)
-	if (msg and msg:find(L.ADDON) and (msg:find(L.STATS_RESPONSE_PREFIX) or msg:find(L.ADDON .. L.STATS_NO_DATA))) then
+local function myrankFilterSend(self, event, msg)
+	if (msg:find(L.ADDON) and (msg:find(L.MYRANK2, 1, true) or msg:find(L.MYRANK_NONE, 1, true))) then
 		return true;
 	end
 	return false;
@@ -954,18 +701,17 @@ end
 ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", benchFilterRecieve);
 ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", helpFilterRecieve);
 ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", altFilterRecieve);
-ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", statsFilterRecieve);
 ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", helpFilterSend);
 ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", altFilterSend);
 ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", benchFilterSend);
-ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", statsFilterSend);
+ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", myrankFilterRecieve);
+ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", myrankFilterSend);
 
 local options = CreateFrame("Frame");
 options:Hide();
 
 RAT.OptionsCategories = {};
 RAT.OptionsCategories.Options = Settings.RegisterCanvasLayoutCategory(options, "Raid Attendance Tracker");
-RAT.OptionsCategories.Options.ID = "RATOptions";
 Settings.RegisterAddOnCategory(RAT.OptionsCategories.Options);
 
 function RAT_OnAddonCompartmentClick(addonName, buttonName)

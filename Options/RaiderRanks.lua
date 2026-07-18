@@ -52,7 +52,6 @@ scanRRButton:SetScript("OnClick", function(self)
 			_G[frame]:SetChecked(true);
 		end
 	end
-	RAT:InitEligibleGuildMembers();
 	self:Hide();
 end);
 
@@ -117,7 +116,7 @@ rrOptions:SetScript("OnShow", function()
 end);
 
 rrOptions:SetScript("OnHide", function()
-	RAT:InitEligibleGuildMembers();
+	RAT:ReconcileRoster();
 end);
 
 Settings.RegisterAddOnCategory(RAT.OptionsCategories.RaiderRanks);

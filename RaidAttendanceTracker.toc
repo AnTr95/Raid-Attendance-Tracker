@@ -1,6 +1,6 @@
 ## Interface: 120007
 ## Title: Raid Attendance Tracker
-## Version: 4.2a
+## Version: 4.3
 ## Author: Ant-Kazzak
 ## Category: Dungeons & Raids
 ## Notes: Tracks the attendance of your raiders
@@ -11,7 +11,7 @@
 
 Localization.enUS.lua
 RaidAttendanceTracker.lua
-RaidAttendanceTrackerSync.lua
+RaidAttendanceTrackerComms.lua
 Options\RaidTimes.lua
 Options\RaiderRanks.lua
 Options\Settings.lua

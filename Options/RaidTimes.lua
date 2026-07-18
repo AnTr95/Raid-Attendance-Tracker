@@ -7,8 +7,7 @@ local rtFrames = nil;
 local rtOptions = CreateFrame("Frame");
 rtOptions:Hide();
 
-local cat, layout = Settings.RegisterCanvasLayoutSubcategory(RAT.OptionsCategories.Options, rtOptions, "Raid Times Settings");
-RAT.OptionsCategories.RaidTimes = cat;
+RAT.OptionsCategories.RaidTimes = Settings.RegisterCanvasLayoutSubcategory(RAT.OptionsCategories.Options, rtOptions, "Raid Times Settings");
 
 local addonText = rtOptions:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge");
 addonText:SetText(L.ADDON_FULL);
@@ -307,7 +306,3 @@ rtOptions:SetScript("OnShow", function()
 end);
 
 Settings.RegisterAddOnCategory(RAT.OptionsCategories.RaidTimes);
-
-function RAT:GetRTOptionsID()
-	return RAT.OptionsCategories.RaidTimes:GetID();
-end

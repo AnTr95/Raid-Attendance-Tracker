@@ -290,7 +290,7 @@ function RAT:CheckForDSTTransition()
 			RAT:SetNextAward(GetServerTime());
 			RAT:BroadcastNextAward(RAT:FromSecondsToBestUnit(RAT_SavedData.NextAward - GetServerTime()));
 		end
-		C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_DST_CHANGE, "GUILD");
+		RAT:SendGuild(L.ADDON .. L.BROADCAST_DST_CHANGE);
 	end
 end
 

@@ -28,7 +28,7 @@ function RAT:Broadcast(amount)
 	if (IsInRaid()) then
 		local bench = RAT:GetBench();
 		for i = 1, GetNumGroupMembers() do
-			local pl = Ambiguate(GetUnitName("raid" .. i, true), "none");
+			local pl = RAT:CleanName(GetUnitName("raid" .. i, true));
 			local index = RAT:GetGuildMemberIndex(pl);
 			if (RAT:GetMain(pl)) then
 				local main = RAT:GetMain(pl);
@@ -54,10 +54,10 @@ function RAT:Broadcast(amount)
 		end
 	end
 	local strings = RAT:ToString(awardedPlayers);
-	C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_AWARDED_ALL1 .. amount .. L.BROADCAST_AWARDED_ALL2 .. strings[1], "GUILD");
+	RAT:SendGuild(L.ADDON .. L.BROADCAST_AWARDED_ALL1 .. amount .. L.BROADCAST_AWARDED_ALL2 .. strings[1]);
 	for i = 2, #strings do
 		C_Timer.After(i*0.5, function()
-			C_ChatInfo.SendChatMessage(strings[i], "GUILD");
+			RAT:SendGuild(strings[i]);
 		end);
 	end
 end
@@ -66,22 +66,25 @@ end
 function RAT:BroadcastAbsent(players)
 	local strings = RAT:ToString(players);
 	C_Timer.After(1.5, function()
-		C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_ABSENT_ALL .. strings[1], "GUILD");
+		RAT:SendGuild(L.ADDON .. L.BROADCAST_ABSENT_ALL .. strings[1]);
 	end);
 	for i = 2, #strings do
 		C_Timer.After(1.5+(i*0.5), function()
-			C_ChatInfo.SendChatMessage(strings[i], "GUILD");
+			RAT:SendGuild(strings[i]);
 		end);
 	end
 end
 --[[
 function RAT:BroadcastStrike(player)
-	C_ChatInfo.SendChatMessage("RAT: following players recieved a strike: " .. player, "GUILD");
+	C_ChatInfo.SendChatMessage("RAT: following players recieved a strike: " .. player, "GUILD", "COMMON", nil);
 end
 ]]
 function RAT:BroadcastNextAward(time)
+	if (not C_GuildInfo.CanEditOfficerNote()) then
+		return;
+	end
 	C_Timer.After(4, function()
-		C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_AWARD_NEXT .. time, "GUILD");
+		RAT:SendGuild(L.ADDON .. L.BROADCAST_AWARD_NEXT .. time);
 	end);
 end
 
@@ -94,7 +97,7 @@ function RAT:BroadcastSummary()
 				local gainedRank = math.abs(RAT_SavedData.Attendance[player].Rank - data.Rank);
 				local preRank = tonumber(RAT_SavedData.Attendance[player].Rank) <= tonumber(data.Rank) and "gained " or "lost ";
 				if (UnitIsConnected(player)) then
-					C_ChatInfo.SendChatMessage(L.SUMMARY1 .. gainedAttendance .. L.SUMMARY2 .. gainedAbsence .. L.SUMMARY3 .. preRank .. gainedRank .. L.SUMMARY4, "WHISPER", nil, player);
+					C_ChatInfo.SendChatMessage(L.SUMMARY1 .. gainedAttendance .. L.SUMMARY2 .. gainedAbsence .. L.SUMMARY3 .. preRank .. gainedRank .. L.SUMMARY4, "WHISPER", "COMMON", RAT:WhisperTarget(player));
 				end
 			end
 		end
@@ -119,9 +122,7 @@ function RAT:Contains(arr, value)
 	return false;
 end
 
--- RAT:AntiCheat() removed: guild notes (public and officer) are no longer
--- readable or writable in WoW 12.0. Data integrity is maintained through
--- the timestamp-validated addon message sync system instead.
+-- RAT:AntiCheat removed in 4.0: notes are no longer the store; officer-authority on sync replaces it.
 
 function RAT:Eligible(playerIndex)
 	if (IsInGuild() and playerIndex ~= -1) then
@@ -197,24 +198,6 @@ function RAT:Round(x)
 	return x+0.5-(x+0.5)%1;
 end
 
-function RAT:NormalizePlayerName(name)
-	if (type(name) ~= "string" or name == "") then
-		return name;
-	end
-
-	local normalized = Ambiguate(name, "none");
-	if (type(normalized) ~= "string" or normalized == "") then
-		return name;
-	end
-
-	local first, second = normalized:match("^(.-)%-(.-)%-.+$");
-	if (first and second and first ~= "" and second ~= "") then
-		return first .. "-" .. second;
-	end
-
-	return normalized;
-end
-
 --[[
 	Checking if a table contains a given value and if it does, what index is the value located at
 	param(arr) table
@@ -249,17 +232,11 @@ end
 	Returns the guild members index based of a name, if no name is found return -1
 ]]
 function RAT:GetGuildMemberIndex(name)
-	if (type(name) ~= "string" or name == "") then
-		return -1;
-	end
-	name = RAT:NormalizePlayerName(name);
+	name = RAT:CleanName(name);
 	for i = 1, GetNumGuildMembers() do
-		local fullName = select(1, GetGuildRosterInfo(i));
-		if (type(fullName) == "string" and fullName ~= "") then
-			fullName = RAT:NormalizePlayerName(fullName);
-			if (name == fullName) then
-				return i;
-			end
+		local fullName = RAT:CleanName(GetGuildRosterInfo(i));
+		if (name == fullName) then
+			return i;
 		end
 	end
 	return -1;
@@ -267,30 +244,22 @@ end
 
 function RAT:InitGuildMemberIndexes()
 	for i = 1, GetNumGuildMembers() do
-		local fullName = select(1, GetGuildRosterInfo(i));
-		if (type(fullName) == "string" and fullName ~= "") then
-			fullName = Ambiguate(fullName, "none");
-			guildMemberIndexes[fullName] = i;
-		end
+		local fullName = RAT:CleanName(GetGuildRosterInfo(i));
+		guildMemberIndexes[fullName] = i;
 	end
 	return guildMemberIndexes;
 end
 
 function RAT:GetGuildMemberIndexLookup(name)
-	name = RAT:NormalizePlayerName(name);
 	if (guildMemberIndexes[name]) then
 		return guildMemberIndexes[name];
 	end
 	return -1;
 end
 
+-- RAT:UpdateNote removed in 4.0: no more note writes. No-op stub until the last caller
+-- (Command Center delete) is rewritten in Task 10, then this is deleted.
 function RAT:UpdateNote(name, index)
-	-- DEPRECATED: Officer notes are no longer writable in 12.0
-	-- Data is now synced via addon messages and saved variables instead
-	-- This function is kept for compatibility but does nothing
-	if index ~= -1 then
-		RAT:SendDebugMessage("UpdateNote called for " .. name .. " - using sync system instead");
-	end
 end
 
 --[[
@@ -340,30 +309,11 @@ function RAT:ToString(arr)
 	strings[#strings+1] = sb;
 	return strings;
 end
-
 --[[
 	Splits the given keyword on each whitespace and stores it in a table
 ]]
-function RAT:Split(keyword, delimiter)
+function RAT:Split(keyword)
 	local words = {};
-	if (type(keyword) ~= "string" or keyword == "") then
-		return words;
-	end
-
-	if (delimiter and delimiter ~= "") then
-		local start = 1;
-		while true do
-			local pos = string.find(keyword, delimiter, start, true);
-			if not pos then
-				words[#words + 1] = string.sub(keyword, start);
-				break;
-			end
-			words[#words + 1] = string.sub(keyword, start, pos - 1);
-			start = pos + string.len(delimiter);
-		end
-		return words;
-	end
-
 	local count = 1;
 	for word in keyword:gmatch("%S+") do
 		words[count] = word;
@@ -419,14 +369,52 @@ function RAT:GetHighestRankedPlayer(players)
 	return winner;
 end
 
-function RAT:Sync()
-	-- Compatibility wrapper for legacy Sync() calls.
-	-- New synchronization is handled via addon messages (FULLSYNC).
-	if (RAT:IsMaster()) then
-		RAT:BroadcastFullSync();
-	else
-		RAT:SendDebugMessage("Note: Sync() is deprecated. Use BroadcastFullSync() instead.");
+-- Recompute Percent/Score for every tracked main and re-sort ranks from the local store.
+-- Replaces the old note-parsing Sync() (4.0): the client store is the source of truth.
+function RAT:RebuildRanks()
+	RAT_SavedData.Ranks = {};
+	for name, data in pairs(RAT_SavedData.Attendance) do
+		if (not RAT:GetMain(name)) then
+			RAT_SavedData.Ranks[#RAT_SavedData.Ranks+1] = name;
+			data.Attended = tonumber(data.Attended) or 0;
+			data.Absent = tonumber(data.Absent) or 0;
+			data.Strikes = tonumber(data.Strikes) or 0;
+			data.Percent = RAT:CalculatePercent(name);
+			data.Score = RAT:CalculateScore(name);
+		end
 	end
+	RAT:UpdateRank();
+end
+
+-- Back-compat shim: everything that used to call Sync() now rebuilds locally.
+function RAT:Sync()
+	RAT:RebuildRanks();
+end
+
+-- Add newly-eligible mains, drop members no longer in the guild. Officer-authoritative;
+-- propagates via LastModified. (Task 9)
+function RAT:ReconcileRoster()
+	-- Guard against a not-yet-loaded roster: an empty roster would otherwise wipe the DB.
+	if (GetNumGuildMembers() == 0) then return; end
+	local present = {};
+	for i = 1, GetNumGuildMembers() do
+		local name = RAT:CleanName(select(1, GetGuildRosterInfo(i)));
+		present[name] = true;
+		if (RAT:Eligible(i) and not RAT:GetMain(name) and not RAT:ContainsKey(RAT_SavedData.Attendance, name)) then
+			RAT:InitPlayer(name);
+		end
+	end
+	for name in pairs(RAT_SavedData.Attendance) do
+		if (not present[name]) then
+			RAT_SavedData.Attendance[name] = nil;
+		end
+	end
+	RAT:RebuildRanks();
+end
+
+-- On-demand pull of the freshest officer snapshot (used before showing ranks / myrank).
+function RAT:RequestFreshest()
+	RAT:BroadcastVersion();
 end
 
 --[[
@@ -453,7 +441,7 @@ end
 function RAT:GetHighestRankingUser()
 	local userRank = select(3,GetGuildInfo("player"));
 	local highestRank = userRank;
-	local highestUser = Ambiguate(GetUnitName("player", true), "none");
+	local highestUser = RAT:CleanName(GetUnitName("player", true));
 	for user, rank in pairs(RAT.Users) do
 		if (rank < highestRank) then
 			highestRank = rank;
@@ -483,13 +471,20 @@ function RAT:InsertionSort()
 		RAT_SavedData.Ranks[i+1] = current;
 	end
 end
+--[[
 function RAT:GetMain(alt)
-	-- Reads from AltDb flat structure {[altName]={Main="mainName",Timestamp=serverTime}}
-	-- Officer notes are no longer readable/writable in WoW 12.0.
-	if (not alt or type(alt) ~= "string" or alt == "") then return false; end
-	local entry = RAT_SavedData.AltDb and RAT_SavedData.AltDb[alt];
-	if (entry and type(entry) == "table" and entry.Main) then
-		return entry.Main;
+	for main, data in pairs(RAT_SavedData.AltDb) do
+		local alts = data.Alts;
+		if (RAT:Contains(alts, alt)) then
+			return main;
+		end
+	end
+	return false;
+end]]
+function RAT:GetMain(alt)
+	local main = RAT_SavedData.Alts and RAT_SavedData.Alts[alt];
+	if (main) then
+		return main;
 	end
 	return false;
 end
@@ -536,15 +531,12 @@ function RAT:UpdateAllAlts()
 	end
 end]]
 
+-- 4.0: alts now resolve to their main dynamically via RAT:GetMain, so there is nothing
+-- to mirror. These are no-op stubs until Tasks 10/12 remove the last call sites, then deleted.
 function RAT:UpdateAllAlts()
-	-- DEPRECATED: public notes are no longer writable in WoW 12.0.
-	-- Alt data is now propagated via the FULLSYNC/ALT addon message system.
 end
 
-
 function RAT:UpdatePlayerAlts(main)
-	-- DEPRECATED: public notes are no longer writable in WoW 12.0.
-	-- Alt data is now propagated via the FULLSYNC/ALT addon message system.
 end
 
 --[[
@@ -604,11 +596,11 @@ f:SetScript("OnEvent", function(self, event, ...)
 			if (#players > 0) then
 				local strings = RAT:ToString(players);
 				C_Timer.After(0.7, function() 
-					C_ChatInfo.SendChatMessage(L.ADDON .. L.BROADCAST_CALENDAR_PUNISHED .. strings[1], "GUILD");
+					RAT:SendGuild(L.ADDON .. L.BROADCAST_CALENDAR_PUNISHED .. strings[1]);
 				end);
 				for i = 2, #strings do
 					C_Timer.After(0.7+(i*0.1), function() 
-						C_ChatInfo.SendChatMessage(strings[i], "GUILD");
+						RAT:SendGuild(strings[i]);
 					end);
 				end
 			end

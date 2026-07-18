@@ -192,13 +192,47 @@ end);
 	UIDropDownMenu_Initialize(minimapStateMenu, Initialize_MinimapState)
 ]]
 
+local orFrames = nil;
+local officerRankLabel = settingsOptions:CreateFontString(nil, "ARTWORK", "GameFontNormal");
+officerRankLabel:SetText(L.OPTIONS_OFFICER_RANKS_TEXT);
+officerRankLabel:SetPoint("TOPLEFT", 60, -295);
+local function initORFrames()
+	if (orFrames) then return; end
+	orFrames = {};
+	local ranks = RAT:GetAllGuildRanks();
+	for i = 1, #ranks do
+		local text = settingsOptions:CreateFontString("RAT_ORO_Text_" .. ranks[i], "ARTWORK", "GameFontWhite");
+		text:SetText(ranks[i]);
+		text:SetPoint("TOPLEFT", 60+((i+1)%2*150), -320-(math.floor((i-1)/2))*25);
+		table.insert(orFrames, text);
+		local cb = CreateFrame("CheckButton", "RAT_ORO_Checkbox_" .. ranks[i], settingsOptions, "UICheckButtonTemplate");
+		cb:SetSize(20, 20);
+		cb:SetPoint("TOPLEFT", 150+((i+1)%2*150), -315-(math.floor((i-1)/2))*25);
+		cb:SetScript("OnClick", function(self)
+			local exists = RAT:Contains(RAT_SavedOptions.OfficerRanks, ranks[i]);
+			if (self:GetChecked() and not exists) then
+				table.insert(RAT_SavedOptions.OfficerRanks, ranks[i]);
+			elseif (not self:GetChecked() and exists) then
+				table.remove(RAT_SavedOptions.OfficerRanks, exists);
+			end
+		end);
+		table.insert(orFrames, cb);
+	end
+end
+
 settingsOptions:SetScript("OnShow", function()
 	sortRankMenu:SetDefaultText(RAT_SavedOptions.RankingAlgo);
 	punishCalendarCheckButton:SetChecked(RAT_SavedOptions.PunishCalendar);
 	awardStartCheckButton:SetChecked(RAT_SavedOptions.AwardStart);
 	frequencyEditBox:SetText(RAT_SavedOptions.Frequency);
-	--Initialize_MinimapState();
-	--UIDropDownMenu_SetSelectedName(minimapStateMenu, RAT_SavedOptions.MinimapMode);
+	initORFrames();
+	for _, fr in pairs(orFrames) do
+		fr:Show();
+		local n = fr:GetName();
+		if (n and string.find(n, "RAT_ORO_Checkbox_")) then
+			fr:SetChecked(RAT:Contains(RAT_SavedOptions.OfficerRanks, string.sub(n, 18)) ~= false);
+		end
+	end
 end);
 
 Settings.RegisterAddOnCategory(RAT.OptionsCategories.Settings);
