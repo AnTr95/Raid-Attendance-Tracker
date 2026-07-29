@@ -190,6 +190,9 @@ function RAT:FlushQueue()
 		if (item.kind == "guild") then
 			C_ChatInfo.SendChatMessage(item.msg, "GUILD");
 			ok = true;
+		elseif (item.kind == "whisper") then
+			C_ChatInfo.SendChatMessage(item.msg, "WHISPER", nil, item.target);
+			ok = true;
 		else
 			ok = rawSendAddon(item);
 		end
@@ -210,6 +213,43 @@ end
 function RAT:SendGuild(msg)
 	outQueue[#outQueue+1] = { kind = "guild", msg = msg };
 	RAT:FlushQueue();
+end
+
+-- Queued WHISPER chat: defers past the messaging lockdown (combat/encounter) like guild posts.
+function RAT:SendWhisper(msg, target)
+	outQueue[#outQueue+1] = { kind = "whisper", msg = msg, target = RAT:WhisperTarget(target) };
+	RAT:FlushQueue();
+end
+
+-- Messaging-free poster election. Every in-raid client independently computes the
+-- highest-ranked officer currently in the raid from synced guild data -- deterministic
+-- across clients, so exactly one posts, AND it works during the messaging lockdown
+-- (the old GETRANK broadcast was dropped in combat, so every officer self-elected).
+function RAT:GetRaidPoster()
+	local bestName, bestRankIndex;
+	for i = 1, GetNumGroupMembers() do
+		local full = GetUnitName("raid" .. i, true);
+		if (full) then
+			local idx = RAT:GetGuildMemberIndex(full);
+			if (idx ~= -1) then
+				local rankName = select(2, GetGuildRosterInfo(idx));
+				local rankIndex = select(3, GetGuildRosterInfo(idx));
+				if (RAT:RankNameIsOfficer(rankName)) then
+					local name = RAT:CleanName(full);
+					if (not bestRankIndex or rankIndex < bestRankIndex or (rankIndex == bestRankIndex and name < bestName)) then
+						bestRankIndex = rankIndex;
+						bestName = name;
+					end
+				end
+			end
+		end
+	end
+	return bestName;
+end
+
+function RAT:AmIRaidPoster()
+	if (not C_GuildInfo.CanEditOfficerNote()) then return false; end
+	return RAT:GetRaidPoster() == RAT:CleanName(GetUnitName("player", true));
 end
 
 function RAT:InitComms()

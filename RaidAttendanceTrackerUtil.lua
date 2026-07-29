@@ -89,19 +89,22 @@ function RAT:BroadcastNextAward(time)
 end
 
 function RAT:BroadcastSummary()
-	if (RAT_SavedData.Summary) then
-		for player, data in pairs(RAT_SavedData.Summary) do
-			if (RAT_SavedData.Attendance[player]) then
-				local gainedAttendance = RAT_SavedData.Attendance[player].Attended - data.Attended;
-				local gainedAbsence = RAT_SavedData.Attendance[player].Absent - data.Absent;
-				local gainedRank = math.abs(RAT_SavedData.Attendance[player].Rank - data.Rank);
-				local preRank = tonumber(RAT_SavedData.Attendance[player].Rank) <= tonumber(data.Rank) and "gained " or "lost ";
-				if (UnitIsConnected(player)) then
-					C_ChatInfo.SendChatMessage(L.SUMMARY1 .. gainedAttendance .. L.SUMMARY2 .. gainedAbsence .. L.SUMMARY3 .. preRank .. gainedRank .. L.SUMMARY4, "WHISPER", "COMMON", RAT:WhisperTarget(player));
-				end
+	if (not RAT_SavedData.Summary) then return; end
+	local whispered = 0;
+	for player, data in pairs(RAT_SavedData.Summary) do
+		if (RAT_SavedData.Attendance[player]) then
+			local gainedAttendance = RAT_SavedData.Attendance[player].Attended - data.Attended;
+			local gainedAbsence = RAT_SavedData.Attendance[player].Absent - data.Absent;
+			local gainedRank = math.abs(RAT_SavedData.Attendance[player].Rank - data.Rank);
+			local preRank = tonumber(RAT_SavedData.Attendance[player].Rank) <= tonumber(data.Rank) and "gained " or "lost ";
+			local target = RAT:WhisperTarget(player); -- resolve char-name key -> Name-Realm (cross-realm safe)
+			if (target and UnitIsConnected(target)) then
+				RAT:SendWhisper(L.SUMMARY1 .. gainedAttendance .. L.SUMMARY2 .. gainedAbsence .. L.SUMMARY3 .. preRank .. gainedRank .. L.SUMMARY4, target);
+				whispered = whispered + 1;
 			end
 		end
 	end
+	RAT:SendDebugMessage("BroadcastSummary: " .. RAT:GetSize(RAT_SavedData.Summary) .. " entries, whispered " .. whispered);
 end
 
 --[[

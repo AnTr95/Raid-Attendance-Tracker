@@ -403,7 +403,7 @@ f:SetScript("OnUpdate", function(self, elapsed)
 			RAT_SavedData.Summary = {};
 			if (C_GuildInfo.CanEditOfficerNote()) then
 				RAT:BroadcastNextAward(RAT:FromSecondsToBestUnit(RAT_SavedData.NextAward-time));
-				C_ChatInfo.SendAddonMessage("RATSYSTEM", "GETBENCH", "GUILD");
+				RAT:SendAddon("GETBENCH", "GUILD");
 			end
 		else
 			if (RAT:IsItRaidStart()) then
@@ -418,10 +418,9 @@ f:SetScript("OnUpdate", function(self, elapsed)
 			RAT:SendDebugMessage("NextAward passed; rewards will be given out.");
 			RAT:SetNextAward(time);
 			if (IsInRaid()) then
-				RAT.Users = {};   -- reset so only officers who respond this round are considered for posting
-				C_ChatInfo.SendAddonMessage("RATSYSTEM", "GETRANK", "RAID");
 				C_Timer.After(10, function()
-					local amPoster = (RAT:GetHighestRankingUser() == GetUnitName("player", true)) and C_GuildInfo.CanEditOfficerNote() and true or false;
+					local amPoster = RAT:AmIRaidPoster();
+					RAT:SendDebugMessage("Award election: lockdown=" .. tostring(RAT:IsLockedDown()) .. " poster=" .. tostring(RAT:GetRaidPoster()) .. " me=" .. tostring(RAT:CleanName(GetUnitName("player", true))) .. " amPoster=" .. tostring(amPoster));
 					RAT:AllAttended(1, amPoster);
 					if (RAT_SavedOptions.PunishCalendar and RAT:IsItRaidStart() and amPoster) then
 						RAT:PunishCalendar();
@@ -430,7 +429,7 @@ f:SetScript("OnUpdate", function(self, elapsed)
 						RAT:BroadcastNextAward(RAT:FromSecondsToBestUnit(RAT_SavedData.NextAward-time));
 					end
 					if (RAT:IsItRaidFinish()) then
-						RAT:SendDebugMessage("Raid ended. Sending summary and reseting variables...");
+						RAT:SendDebugMessage("Raid finish detected. amPoster=" .. tostring(amPoster) .. " summaryEntries=" .. RAT:GetSize(RAT_SavedData.Summary));
 						C_Timer.NewTicker(1, function(s)
 							if (not RAT:IsAwardHandOutRunning()) then
 								if (amPoster) then
@@ -519,7 +518,7 @@ f:SetScript("OnEvent", function(self, event, ...)
 							RAT:SendGuild(L.ADDON .. sender .. L.BROADCAST_BENCHED_PLAYER);
 							RAT:BroadcastCommand("BENCH", { sender });
 						elseif (RAT:IsBenched(sender)) then
-							C_ChatInfo.SendChatMessage(L.ADDON .. sender .. L.ERROR_BENCHED_ALREADY, "WHISPER", nil, replyTo);
+							RAT:SendWhisper(L.ADDON .. sender .. L.ERROR_BENCHED_ALREADY, replyTo);
 						end
 					end
 				elseif (RAT:GetSize(args) == 2 and args[1] == "alt") then
@@ -534,23 +533,23 @@ f:SetScript("OnEvent", function(self, event, ...)
 							end
 							RAT:RebuildRanks();
 							RAT:Touch();
-							C_ChatInfo.SendChatMessage(L.ADDON .. sender .. L.SYSTEM_ALT_ADDED .. main .. L.DOT, "WHISPER", nil, replyTo);
+							RAT:SendWhisper(L.ADDON .. sender .. L.SYSTEM_ALT_ADDED .. main .. L.DOT, replyTo);
 							RAT:BroadcastCommand("ALT", { sender, main });
 						else
-							C_ChatInfo.SendChatMessage(L.ADDON .. args[2] .. L.ERROR_PLAYER_INELIGIBLE, "WHISPER", nil, replyTo);
+							RAT:SendWhisper(L.ADDON .. args[2] .. L.ERROR_PLAYER_INELIGIBLE, replyTo);
 						end
 					end
 				elseif (arg == "help") then
-					C_ChatInfo.SendChatMessage(L.ADDON .. L.HELP1, "WHISPER", nil, replyTo);
-					C_ChatInfo.SendChatMessage(L.HELP2, "WHISPER", nil, replyTo);
+					RAT:SendWhisper(L.ADDON .. L.HELP1, replyTo);
+					RAT:SendWhisper(L.HELP2, replyTo);
 				elseif (arg == "myrank") then
 					local target = sender;
 					if (RAT:GetMain(sender)) then target = RAT:GetMain(sender); end
 					local d = RAT_SavedData.Attendance[target];
 					if (d) then
-						C_ChatInfo.SendChatMessage(L.ADDON .. L.MYRANK1 .. d.Rank .. L.MYRANK2 .. d.Attended .. L.MYRANK3 .. d.Absent .. L.MYRANK4 .. d.Percent .. "%", "WHISPER", nil, replyTo);
+						RAT:SendWhisper(L.ADDON .. L.MYRANK1 .. d.Rank .. L.MYRANK2 .. d.Attended .. L.MYRANK3 .. d.Absent .. L.MYRANK4 .. d.Percent .. "%", replyTo);
 					else
-						C_ChatInfo.SendChatMessage(L.ADDON .. L.MYRANK_NONE, "WHISPER", nil, replyTo);
+						RAT:SendWhisper(L.ADDON .. L.MYRANK_NONE, replyTo);
 					end
 				end
 			end
