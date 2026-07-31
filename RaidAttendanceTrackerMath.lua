@@ -226,9 +226,9 @@ function RAT:AllAttended(attended, poster)
 					if (not isAwardHandOutRunning) then
 						isAwardHandOutRunning = true;
 					end
+					attendingPlayers[#attendingPlayers+1] = pl;
 					C_Timer.After(count*0.06, function()
 						RAT:PlayerAttended(pl, attended);
-						attendingPlayers[#attendingPlayers+1] = pl;
 						if (i == GetNumGroupMembers()) then
 							isAwardHandOutRunning = false;
 						end
@@ -247,9 +247,9 @@ function RAT:AllAttended(attended, poster)
 				if (not isAwardHandOutRunning) then
 					isAwardHandOutRunning = true;
 				end
+				attendingPlayers[#attendingPlayers+1] = pl;
 				C_Timer.After(count*0.06, function()
 					RAT:PlayerAttended(pl, attended);
-					attendingPlayers[#attendingPlayers+1] = pl;
 					if (i == RAT:GetSize(RAT_SavedData.Bench)) then
 						isAwardHandOutRunning = false;
 					end

@@ -236,13 +236,18 @@ end
 ]]
 function RAT:GetGuildMemberIndex(name)
 	name = RAT:CleanName(name);
+	local fallback = -1;
 	for i = 1, GetNumGuildMembers() do
 		local fullName = RAT:CleanName(GetGuildRosterInfo(i));
 		if (name == fullName) then
-			return i;
+			if (RAT:Eligible(i)) then
+				return i;
+			elseif (fallback == -1) then
+				fallback = i;
+			end
 		end
 	end
-	return -1;
+	return fallback;
 end
 
 function RAT:InitGuildMemberIndexes()
