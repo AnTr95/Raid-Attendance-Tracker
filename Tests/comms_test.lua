@@ -62,3 +62,28 @@ assertEq(RAT:CleanName(nil), nil, "nil is safe")
 -- WhisperTarget: recover a valid single-realm target (roster path needs WoW APIs, so test only names that already carry a realm)
 assertEq(RAT:WhisperTarget("Ant-Kazzak-Kazzak"), "Ant-Kazzak", "whisper target collapses duplicated realm")
 assertEq(RAT:WhisperTarget("Ant-Kazzak"), "Ant-Kazzak", "whisper target keeps single realm")
+
+-- Task 1 (safe-removal plan): restore points
+RAT_SavedData = { LastModified = 5, Attendance = { Ant = { Attended = 3, Absent = 1, Strikes = 0 } }, Alts = {}, Bench = {}, Snapshots = {}, NextSnapshotId = 1 }
+local rpId = RAT:SaveRestorePoint("test-a")
+assertEq(type(rpId), "number", "SaveRestorePoint returns a numeric id")
+assertEq(#RAT_SavedData.Snapshots, 1, "one restore point stored")
+assertEq(RAT_SavedData.Snapshots[1].size, 1, "restore point records player count")
+local rpEntry = RAT:GetRestorePoint(rpId)
+local rpSnap = RAT:DeserializeSnapshot(rpEntry.payload)
+assertEq(rpSnap.Attendance.Ant.Attended, 3, "restore point payload round-trips attendance")
+assertEq(#RAT:ListRestorePoints(), 1, "ListRestorePoints returns one entry")
+-- cap eviction: 1 + 12 = 13 saves, capped at 10, oldest (rpId) evicted
+for i = 1, 12 do RAT:SaveRestorePoint("bulk") end
+assert(#RAT_SavedData.Snapshots <= 10, "restore points capped at 10")
+assertEq(RAT:GetRestorePoint(rpId), nil, "oldest restore point evicted")
+
+-- Task 2 (safe-removal plan): RestoreFrom recovers a snapshot and Touches LastModified
+RAT_SavedData = { LastModified = 1, Attendance = { Bob = { Attended = 10, Absent = 2, Strikes = 0 } }, Alts = {}, Bench = {}, Snapshots = {}, NextSnapshotId = 1 }
+local backupId = RAT:SaveRestorePoint("test-restore")
+RAT_SavedData.Attendance = {}   -- simulate a wipe
+SetFakeServerTime(2000000)
+assertEq(RAT:RestoreFrom(backupId), true, "RestoreFrom returns true for a valid id")
+assertEq(RAT_SavedData.Attendance.Bob.Attended, 10, "RestoreFrom recovers attendance")
+assertEq(RAT_SavedData.LastModified, 2000000, "RestoreFrom Touches LastModified so it wins the sync")
+assertEq(RAT:RestoreFrom(99999), false, "RestoreFrom returns false for unknown id")

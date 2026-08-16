@@ -19,6 +19,7 @@ local syncDelay = 10;
 local synced = false;
 local benched = {};
 local awaitingSync = false;
+local rosterReady = false;
 local lastAttending = {};
 local lastAbsent = {};
 local lastAmount = 0;
@@ -165,6 +166,12 @@ function RAT:SendDebugMessage(msg)
 	end
 end
 
+-- True once the first non-empty, settled GUILD_ROSTER_UPDATE has landed (see the
+-- event handler). Gates the views and the inbound sync handshake for all clients.
+function RAT:RosterReady()
+	return rosterReady;
+end
+
 --[[
 	Handles all chat commands 
 	param(msg) string
@@ -175,7 +182,11 @@ local function handler(msg, editbox)
 	if (cmd ~= "") then
 		if (cmd == "ranks") then
 			-- Read-only: any synced guild member (officer or not) may view the rankings.
-			if (synced) then
+			if (not synced or not awaitingSync) then
+				DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.SYSTEM_STILL_SYNCING1 .. math.floor(syncDelay+0.5) .. L.SYSTEM_STILL_SYNCING3);
+			elseif (not rosterReady) then
+				DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. L.STILL_LOADING);
+			else
 				RAT:RequestFreshest();
 				C_Timer.After(1.5, function()
 					RAT:UpdateRank();
@@ -184,8 +195,6 @@ local function handler(msg, editbox)
 						leaderBoard:Show();
 					end
 				end);
-			else
-				DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.SYSTEM_STILL_SYNCING1 .. math.floor(syncDelay+0.5) .. L.SYSTEM_STILL_SYNCING3);
 			end
 		elseif (synced and C_GuildInfo.CanEditOfficerNote()) then
 			if (cmd == "award") then
@@ -359,6 +368,22 @@ local function handler(msg, editbox)
 					RAT_SavedOptions.Debug = false;
 					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.SUCCESS .. L.ADDON .. L.SYSTEM_DEBUG_DISABLED);
 				end
+			elseif (cmd == "backups") then
+				local points = RAT:ListRestorePoints();
+				if (#points == 0) then
+					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.DEBUG .. L.ADDON .. L.BACKUP_NONE);
+				end
+				for _, p in ipairs(points) do
+					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.DEBUG .. "#" .. p.id .. "  " .. date("%y/%m/%d %H:%M", p.ts) .. "  " .. p.size .. L.BACKUP_PLAYERS .. tostring(p.reason) .. ")");
+				end
+			elseif (cmd == "restore") then
+				local id = tonumber(arg);
+				if (id and RAT:RestoreFrom(id)) then
+					RAT:SendGuild(L.ADDON .. L.BACKUP_RESTORED .. id .. L.DOT);
+					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.SUCCESS .. L.ADDON .. L.BACKUP_RESTORED .. id .. L.DOT);
+				else
+					DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. L.BACKUP_NOT_FOUND1 .. tostring(arg) .. L.BACKUP_NOT_FOUND2);
+				end
 			end
 		elseif (not C_GuildInfo.CanEditOfficerNote()) then
 			DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ERROR_NOT_OFFICER);
@@ -388,11 +413,10 @@ f:SetScript("OnUpdate", function(self, elapsed)
 		syncDelay = syncDelay - elapsed;
 	end
 	if (syncDelay <= 0 and not synced) then
-		RAT:SendDebugMessage("Sync delay has passed. Requesting Guild Roster..., Starting Sync");
+		RAT:SendDebugMessage("Sync delay has passed. Requesting Guild Roster..., awaiting GUILD_ROSTER_UPDATE.");
 		synced = true;
+		awaitingSync = true;
 		C_GuildInfo.GuildRoster();
-		RAT:ReconcileRoster();
-		RAT:BroadcastVersion();
 	end
 	local time = GetServerTime();
 	if (time > RAT_SavedData.NextAward and RAT_SavedData.NextAward ~= 0) then
@@ -474,6 +498,8 @@ f:SetScript("OnEvent", function(self, event, ...)
 			if (RAT_SavedData.DebugLog == nil) then RAT_SavedData.DebugLog = {}; end
 			if (RAT_SavedData.Alts == nil) then RAT_SavedData.Alts = {}; end
 			if (RAT_SavedData.LastModified == nil) then RAT_SavedData.LastModified = 0; end
+			if (RAT_SavedData.Snapshots == nil) then RAT_SavedData.Snapshots = {}; end
+			if (RAT_SavedData.NextSnapshotId == nil) then RAT_SavedData.NextSnapshotId = 1; end
 
 			if (RAT_SavedOptions.RaidTimes == nil) then RAT:InitRaidTimes(); end
 			if (RAT_SavedOptions.AwardStart == nil) then RAT_SavedOptions.AwardStart = true; end
@@ -543,13 +569,17 @@ f:SetScript("OnEvent", function(self, event, ...)
 					RAT:SendWhisper(L.ADDON .. L.HELP1, replyTo);
 					RAT:SendWhisper(L.HELP2, replyTo);
 				elseif (arg == "myrank") then
-					local target = sender;
-					if (RAT:GetMain(sender)) then target = RAT:GetMain(sender); end
-					local d = RAT_SavedData.Attendance[target];
-					if (d) then
-						RAT:SendWhisper(L.ADDON .. L.MYRANK1 .. d.Rank .. L.MYRANK2 .. d.Attended .. L.MYRANK3 .. d.Absent .. L.MYRANK4 .. d.Percent .. "%", replyTo);
+					if (not rosterReady) then
+						RAT:SendWhisper(L.ADDON .. L.STILL_LOADING, replyTo);
 					else
-						RAT:SendWhisper(L.ADDON .. L.MYRANK_NONE, replyTo);
+						local target = sender;
+						if (RAT:GetMain(sender)) then target = RAT:GetMain(sender); end
+						local d = RAT_SavedData.Attendance[target];
+						if (d) then
+							RAT:SendWhisper(L.ADDON .. L.MYRANK1 .. d.Rank .. L.MYRANK2 .. d.Attended .. L.MYRANK3 .. d.Absent .. L.MYRANK4 .. d.Percent .. "%", replyTo);
+						else
+							RAT:SendWhisper(L.ADDON .. L.MYRANK_NONE, replyTo);
+						end
 					end
 				end
 			end
@@ -558,10 +588,18 @@ f:SetScript("OnEvent", function(self, event, ...)
 		if (prefix == "RATSYSTEM") then
 			RAT:HandleInbound(msg, sender);
 		end
-	elseif (event == "GUILD_ROSTER_UPDATE" and C_GuildInfo.CanEditOfficerNote()) then
-		if (awaitingSync) then
-			awaitingSync = false;
-			RAT:RebuildRanks();
+	elseif (event == "GUILD_ROSTER_UPDATE") then
+		if (awaitingSync and GetNumGuildMembers() > 0) then
+			local seen = GetNumGuildMembers();
+			C_Timer.After(2, function()
+				if (awaitingSync and GetNumGuildMembers() == seen) then
+					awaitingSync = false;
+					rosterReady = true;
+					RAT:ReconcileRoster();   -- every client cleans its own roster view; no Touch, so it stays local and never overwrites authority
+					RAT:BroadcastVersion();  -- all clients ask "who has latest"; ShouldAdopt still only adopts officer data
+					RAT:SendDebugMessage("Roster settled at " .. seen .. " members; rosterReady, reconcile + broadcast (all clients).");
+				end
+			end);
 		end
 	elseif (event == "PLAYER_LOGIN") then
 		RAT:InitComms();

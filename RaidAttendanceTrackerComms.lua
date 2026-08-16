@@ -1,4 +1,5 @@
 local RAT = RAT;
+local L = RAT_Locals;
 
 --------------------------------------------------------------------------------
 -- Name normalisation
@@ -282,6 +283,14 @@ function RAT:HandleInbound(msg, sender)
 	if (RAT:CleanName(GetUnitName("player")) == RAT:CleanName(sender)) then return; end
 	local msgType, fields = RAT:DecodeMessage(msg);
 
+	-- Don't touch the version/snapshot handshake until the roster is loaded: officer
+	-- verification (GetSenderRank -> roster) would otherwise mis-judge peers. Our own
+	-- post-rosterReady BroadcastVersion re-drives the exchange once we're ready.
+	if (not RAT:RosterReady() and (msgType == "VER" or msgType == "VERQUERY" or msgType == "SNAPDATA")) then
+		RAT:SendDebugMessage("Deferred " .. tostring(msgType) .. " from " .. tostring(sender) .. ": roster not ready");
+		return;
+	end
+
 	if (msgType == "SNAP") then
 		local seq = tonumber(fields[1]);
 		local total = tonumber(fields[2]);
@@ -327,6 +336,67 @@ function RAT:SendSnapshotTo(target)
 	end
 end
 
+--------------------------------------------------------------------------------
+-- Restore points: a capped, serialized snapshot of the DB saved before any
+-- destructive change (reconcile removal, snapshot adopt). Recoverable via
+-- /rat restore <id>, which Touch()es so the recovery re-propagates over sync.
+--------------------------------------------------------------------------------
+
+local RESTORE_CAP = 10;
+
+function RAT:SaveRestorePoint(reason)
+	if (not RAT_SavedData.Snapshots) then RAT_SavedData.Snapshots = {}; end
+	local id = RAT_SavedData.NextSnapshotId or 1;
+	RAT_SavedData.NextSnapshotId = id + 1;
+	local entry = {
+		id = id,
+		ts = GetServerTime(),
+		size = RAT:GetSize(RAT_SavedData.Attendance),
+		reason = reason,
+		payload = RAT:SerializeSnapshot(RAT:CurrentSnapshotData()),
+	};
+	RAT_SavedData.Snapshots[#RAT_SavedData.Snapshots + 1] = entry;
+	while (#RAT_SavedData.Snapshots > RESTORE_CAP) do
+		table.remove(RAT_SavedData.Snapshots, 1);
+	end
+	RAT:SendDebugMessage("Restore point #" .. id .. " saved (" .. entry.size .. " players) before " .. tostring(reason));
+	return id;
+end
+
+function RAT:ListRestorePoints()
+	local out = {};
+	local snaps = RAT_SavedData.Snapshots or {};
+	for i = #snaps, 1, -1 do
+		out[#out + 1] = { id = snaps[i].id, ts = snaps[i].ts, size = snaps[i].size, reason = snaps[i].reason };
+	end
+	return out;
+end
+
+function RAT:GetRestorePoint(id)
+	for _, e in pairs(RAT_SavedData.Snapshots or {}) do
+		if (e.id == id) then return e; end
+	end
+	return nil;
+end
+
+-- Load a restore point into the live DB and Touch() so the recovery wins the
+-- last-writer-wins sync and re-propagates to the guild. Returns false on bad id.
+function RAT:RestoreFrom(id)
+	local entry = RAT:GetRestorePoint(id);
+	if (not entry) then return false; end
+	local data = RAT:DeserializeSnapshot(entry.payload);
+	local attendance = {};
+	for name, a in pairs(data.Attendance) do
+		attendance[name] = { Attended = a.Attended, Absent = a.Absent, Strikes = a.Strikes, Percent = 0, Rank = 99, Score = 0 };
+	end
+	RAT_SavedData.Attendance = attendance;
+	RAT_SavedData.Alts = data.Alts or {};
+	RAT_SavedData.Bench = data.Bench or {};
+	RAT:Touch();
+	RAT:RebuildRanks();
+	return true;
+end
+
 function RAT:BroadcastVersion()
 	RAT:SendAddon(RAT:EncodeMessage("VERQUERY", { RAT_SavedData.LastModified or 0, selfIsOfficer() and 1 or 0 }), "GUILD");
 end
@@ -335,6 +405,22 @@ function RAT:AdoptSnapshot(data, sender)
 	local peerIsOfficer = RAT:RankNameIsOfficer(RAT:GetSenderRank(sender));
 	if (not RAT:ShouldAdopt(RAT_SavedData.LastModified or 0, data.LastModified or 0, peerIsOfficer)) then
 		return;
+	end
+	local beforeN, beforeTotal = 0, 0;
+	for _, a in pairs(RAT_SavedData.Attendance) do
+		beforeN = beforeN + 1;
+		beforeTotal = beforeTotal + (tonumber(a.Attended) or 0);
+	end
+	local incomingN, incomingTotal = 0, 0;
+	for _, a in pairs(data.Attendance) do
+		incomingN = incomingN + 1;
+		incomingTotal = incomingTotal + (tonumber(a.Attended) or 0);
+	end
+	-- Back up before an adopt that would LOSE data in EITHER dimension: fewer players,
+	-- OR lower total attendance (catches value degradation like 40->0 where the player
+	-- count is unchanged -- the "0 on everyone" shape, not just player removal).
+	if (incomingN < beforeN or incomingTotal < beforeTotal) then
+		RAT:SaveRestorePoint(L.BACKUP_REASON_ADOPT .. tostring(sender));
 	end
 	local attendance = {};
 	for name, a in pairs(data.Attendance) do
@@ -345,7 +431,7 @@ function RAT:AdoptSnapshot(data, sender)
 	RAT_SavedData.Bench = data.Bench or {};
 	RAT_SavedData.LastModified = data.LastModified;
 	RAT:RebuildRanks();
-	RAT:SendDebugMessage("Adopted snapshot from officer " .. tostring(sender));
+	RAT:SendDebugMessage("Adopted snapshot from officer " .. tostring(sender) .. ": players " .. beforeN .. "->" .. incomingN .. " attended " .. beforeTotal .. "->" .. incomingTotal);
 end
 
 RAT.MessageHandlers["VERQUERY"] = function(fields, sender)

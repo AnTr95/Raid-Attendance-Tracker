@@ -403,17 +403,26 @@ end
 -- propagates via LastModified. (Task 9)
 function RAT:ReconcileRoster()
 	-- Guard against a not-yet-loaded roster: an empty roster would otherwise wipe the DB.
-	if (GetNumGuildMembers() == 0) then return; end
+	local total, online = GetNumGuildMembers();
+	if (total == 0) then RAT:SendDebugMessage("Reconcile skipped: roster empty"); return; end
 	local present = {};
-	for i = 1, GetNumGuildMembers() do
+	for i = 1, total do
 		local name = RAT:CleanName(select(1, GetGuildRosterInfo(i)));
-		present[name] = true;
-		if (RAT:Eligible(i) and not RAT:GetMain(name) and not RAT:ContainsKey(RAT_SavedData.Attendance, name)) then
-			RAT:InitPlayer(name);
+		if (RAT:Eligible(i)) then
+			present[name] = true;
+			if (not RAT:GetMain(name) and not RAT:ContainsKey(RAT_SavedData.Attendance, name)) then
+				RAT:InitPlayer(name);
+			end
 		end
 	end
+	local remove = {};
 	for name in pairs(RAT_SavedData.Attendance) do
-		if (not present[name]) then
+		if (not present[name]) then remove[#remove + 1] = name; end
+	end
+	RAT:SendDebugMessage("Reconcile: total=" .. total .. " online=" .. tostring(online) .. " attendance=" .. RAT:GetSize(RAT_SavedData.Attendance) .. " remove=" .. #remove .. (#remove > 0 and " [" .. table.concat(remove, ",") .. "]" or ""));
+	if (#remove > 0) then
+		RAT:SaveRestorePoint(L.BACKUP_REASON_RECONCILE);
+		for _, name in ipairs(remove) do
 			RAT_SavedData.Attendance[name] = nil;
 		end
 	end

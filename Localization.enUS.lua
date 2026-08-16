@@ -126,3 +126,13 @@ L.SETUP_FREQUENCY_TOOLTIP = "This determines how often attendance points will be
 L.SETUP_AWARD_RAID_START_TOOLTIP = "This determines if attendance points should be given out when the raid starts, else it will be raid start + frequency\n\nDefault is on.";
 L.SETUP_PUNISH_CALENDAR_TOOLTIP = "This determines if players who did not answer or put tentative should have the first attendance point removed and be a miss instead.\n\nThis is to incentivice players to accept the calendar on time.\n\nDefault is off.";
 
+
+-- Restore points (safe-removal plan)
+L.BACKUP_NONE = "No restore points.";
+L.BACKUP_PLAYERS = " players (";
+L.BACKUP_RESTORED = "Restored attendance from backup #";
+L.BACKUP_NOT_FOUND1 = "No backup with id ";
+L.BACKUP_NOT_FOUND2 = ". Use /rat backups.";
+L.BACKUP_REASON_RECONCILE = "roster reconcile";
+L.STILL_LOADING = "Still loading, try again in a moment.";
+L.BACKUP_REASON_ADOPT = "adopt snapshot from ";
