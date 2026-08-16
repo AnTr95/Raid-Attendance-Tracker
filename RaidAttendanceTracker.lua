@@ -182,7 +182,7 @@ local function handler(msg, editbox)
 	if (cmd ~= "") then
 		if (cmd == "ranks") then
 			-- Read-only: any synced guild member (officer or not) may view the rankings.
-			if (not synced or not awaitingSync) then
+			if (not synced or awaitingSync) then
 				DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.SYSTEM_STILL_SYNCING1 .. math.floor(syncDelay+0.5) .. L.SYSTEM_STILL_SYNCING3);
 			elseif (not rosterReady) then
 				DEFAULT_CHAT_FRAME:AddMessage(escapeCodes.FAIL .. L.ADDON .. L.STILL_LOADING);
